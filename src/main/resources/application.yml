@@ -1,0 +1,37 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: social-wallet
+  messages:
+    basename: messages,ValidationMessages
+    encoding: UTF-8
+    fallback-to-system-locale: false
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/social_wallet}
+    username: ${DB_USER:social_wallet}
+    password: ${DB_PASSWORD:change_me}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/social-wallet}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    org.springframework.security: INFO

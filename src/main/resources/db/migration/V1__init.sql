@@ -1,0 +1,1 @@
+-- Baseline schema (tables will be added per module)
