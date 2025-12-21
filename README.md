@@ -47,6 +47,14 @@ Services exposes:
 http://localhost:8082/realms/social-wallet
 ```
 
+## JWT issuers (dev)
+Pour eviter les erreurs d issuer en local (host vs docker), l API accepte 2 issuers:
+- `http://localhost:8082/realms/social-wallet`
+- `http://keycloak:8080/realms/social-wallet`
+
+Le JWK set est lu sur:
+`http://keycloak:8080/realms/social-wallet/protocol/openid-connect/certs`
+
 ## Endpoints de test
 - Public: `GET /api/public/ping`
 - Prive: `GET /api/private/me` (necessite JWT)
@@ -59,3 +67,4 @@ http://localhost:8082/realms/social-wallet
 ## Notes
 - `application.yml` utilise des variables d environnement (DB_URL, DB_USER, DB_PASSWORD, KEYCLOAK_ISSUER_URI).
 - `Flyway` est active, le schema sera versionne dans `src/main/resources/db/migration`.
+codex resume 019b3bab-3824-7f41-8a3f-7f44cfe54824

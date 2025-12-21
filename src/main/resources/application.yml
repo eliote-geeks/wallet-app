@@ -26,6 +26,13 @@ spring:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8082/realms/social-wallet}
 
+app:
+  security:
+    jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak:8080/realms/social-wallet/protocol/openid-connect/certs}
+    allowed-issuers:
+      - ${KEYCLOAK_ISSUER_EXTERNAL:http://localhost:8082/realms/social-wallet}
+      - ${KEYCLOAK_ISSUER_INTERNAL:http://keycloak:8080/realms/social-wallet}
+
 management:
   endpoints:
     web:
