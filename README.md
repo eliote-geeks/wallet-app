@@ -33,18 +33,18 @@ docker compose up --build
 
 Services exposes:
 - API: http://localhost:8080
-- Keycloak: http://localhost:8081
+- Keycloak: http://localhost:8082
 - Postgres: localhost:5432
 
 ## Configuration Keycloak (dev)
-1. Ouvre Keycloak (http://localhost:8081)
+1. Ouvre Keycloak (http://localhost:8082)
 2. Login admin: `admin` / `admin`
 3. Cree un realm `social-wallet`
 4. Cree un client `social-wallet-api` (confidential ou bearer-only)
 5. Utilise l issuer dans `application.yml`:
 
 ```
-http://localhost:8081/realms/social-wallet
+http://localhost:8082/realms/social-wallet
 ```
 
 ## Endpoints de test

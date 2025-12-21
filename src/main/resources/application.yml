@@ -24,7 +24,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/social-wallet}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8082/realms/social-wallet}
 
 management:
   endpoints:

@@ -18,8 +18,9 @@ services:
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: dev-file
     ports:
-      - "8081:8080"
+      - "8082:8080"
 
   app:
     build: .
