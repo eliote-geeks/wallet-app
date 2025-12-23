@@ -36,6 +36,14 @@ Services exposes:
 - Keycloak: http://localhost:8082
 - Postgres: localhost:5432
 
+## Messagerie (OpenIM)
+Stack OpenIM (open-source) dans `infra/openim`.
+
+```bash
+cd infra/openim
+docker compose up -d
+```
+
 ## Configuration Keycloak (dev)
 1. Ouvre Keycloak (http://localhost:8082)
 2. Login admin: `admin` / `admin`
