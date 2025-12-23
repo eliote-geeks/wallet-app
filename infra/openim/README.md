@@ -10,6 +10,12 @@ cp .env.example .env
 docker compose up -d
 ```
 
+## Smoke test (API)
+
+```bash
+./scripts/smoke-test.sh
+```
+
 ## Environment
 
 Update `.env` before running in production:
