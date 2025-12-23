@@ -6,6 +6,7 @@ Source: https://github.com/openimsdk/openim-docker
 
 ```bash
 cd /home/paul/social-wallet-backend/infra/openim
+cp .env.example .env
 docker compose up -d
 ```
 
