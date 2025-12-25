@@ -24,11 +24,15 @@ spring:
     oauth2:
       resourceserver:
         jwt:
+          # Issuer URI de ton realm Keycloak local
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8082/realms/social-wallet}
 
+# Ajouts spécifiques pour Keycloak / JWT
 app:
   security:
+    # JWK set URI pour récupérer la clé publique
     jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak:8080/realms/social-wallet/protocol/openid-connect/certs}
+    # Liste des issuers autorisés (utile pour dev Docker et localhost)
     allowed-issuers:
       - ${KEYCLOAK_ISSUER_EXTERNAL:http://localhost:8082/realms/social-wallet}
       - ${KEYCLOAK_ISSUER_INTERNAL:http://keycloak:8080/realms/social-wallet}
