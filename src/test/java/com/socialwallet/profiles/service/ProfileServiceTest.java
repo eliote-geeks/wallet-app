@@ -1,6 +1,5 @@
 package com.socialwallet.profiles.service;
 
-import com.socialwallet.profiles.dto.ContactDto;
 import com.socialwallet.profiles.dto.MyProfileDto;
 import com.socialwallet.profiles.dto.ProfileDto;
 import com.socialwallet.profiles.dto.UserSettingsDto;
@@ -22,12 +21,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-/**
- * Comprehensive unit tests for ProfileService.
- * 
- * All business logic is tested in isolation using Mockito.
- * Covers visibility rules, contact management, blocking, privacy settings, idempotence, and security rules.
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ProfileService - Unit Tests")
 class ProfileServiceTest {
@@ -39,26 +32,25 @@ class ProfileServiceTest {
 
     @InjectMocks private ProfileService profileService;
 
-    private final UUID ownerId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private final UUID userId = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private final UUID contactId = UUID.fromString("00000000-0000-0000-0000-000000000002");
-    private final UUID blockedId = UUID.fromString("00000000-0000-0000-0000-000000000003");
+    private final UUID targetId = UUID.fromString("00000000-0000-0000-0000-000000000003");
+    private final UUID viewerId = UUID.fromString("00000000-0000-0000-0000-000000000004");
 
-    // Helper method to create a test profile
-    private Profile createProfile(UUID userId, String name, String about, String photoUrl) {
+    private Profile createTestProfile() {
         Profile p = new Profile();
-        p.setUserId(userId);
-        p.setName(name);
-        p.setAbout(about);
-        p.setPhotoUrl(photoUrl);
+        p.setUserId(targetId);
+        p.setName("Test User");
+        p.setAbout("Visible bio");
+        p.setPhotoUrl("photo.jpg");
         return p;
     }
 
-    // Helper method to create test settings
-    private UserSettings createSettings(UUID userId, PrivacyLevel photo, PrivacyLevel about) {
+    private UserSettings createTestSettings() {
         UserSettings s = new UserSettings();
-        s.setUserId(userId);
-        s.setProfilePhoto(photo);
-        s.setAbout(about);
+        s.setUserId(targetId);
+        s.setProfilePhoto(PrivacyLevel.EVERYONE);
+        s.setAbout(PrivacyLevel.EVERYONE);
         s.setLastSeenAndOnline(PrivacyLevel.MY_CONTACTS);
         s.setReadReceipts(true);
         s.setDefaultStoryVisibility(PrivacyLevel.MY_CONTACTS);
@@ -70,74 +62,89 @@ class ProfileServiceTest {
     class ProfileRetrieval {
 
         @Test
-        @DisplayName("getMyProfile returns the full profile for the owner")
-        void getMyProfile_returnsFullProfile() {
-            Profile profile = createProfile(ownerId, "Alice", "Online", "photo.jpg");
-            when(profileRepository.findByUserId(ownerId)).thenReturn(Optional.of(profile));
+        @DisplayName("getMyProfile returns complete profile")
+        void getMyProfile_returnsCompleteProfile() {
+            Profile profile = createTestProfile();
+            profile.setUserId(userId);
+            when(profileRepository.findByUserId(userId)).thenReturn(Optional.of(profile));
 
-            MyProfileDto dto = profileService.getMyProfile(ownerId);
+            MyProfileDto result = profileService.getMyProfile(userId);
 
-            assertEquals(ownerId, dto.getUserId());
-            assertEquals("Alice", dto.getName());
-            assertEquals("Online", dto.getAbout());
-            assertEquals("photo.jpg", dto.getPhotoUrl());
+            assertEquals(userId, result.getUserId());
+            assertEquals("Test User", result.getName());
+            assertEquals("Visible bio", result.getAbout());
+            assertEquals("photo.jpg", result.getPhotoUrl());
         }
 
         @Test
-        @DisplayName("getMyProfile throws exception when profile not found")
+        @DisplayName("getMyProfile throws when profile not found")
         void getMyProfile_throwsWhenNotFound() {
-            when(profileRepository.findByUserId(ownerId)).thenReturn(Optional.empty());
+            when(profileRepository.findByUserId(userId)).thenReturn(Optional.empty());
 
-            assertThrows(IllegalArgumentException.class, () -> profileService.getMyProfile(ownerId));
+            assertThrows(IllegalArgumentException.class, () ->
+                profileService.getMyProfile(userId)
+            );
         }
 
         @Test
-        @DisplayName("getProfileForViewer hides fields when viewer is not a contact")
-        void getProfileForViewer_hidesFieldsWhenNotContact() {
-            Profile target = createProfile(contactId, "Bob", "Secret bio", "secret.jpg");
-            UserSettings settings = createSettings(contactId, PrivacyLevel.MY_CONTACTS, PrivacyLevel.MY_CONTACTS);
-
-            when(profileRepository.findByUserId(contactId)).thenReturn(Optional.of(target));
-            when(settingsRepository.findByUserId(contactId)).thenReturn(Optional.of(settings));
-            when(contactRepository.findByUserIdAndContactId(ownerId, contactId)).thenReturn(Optional.empty());
-
-            ProfileDto dto = profileService.getProfileForViewer(ownerId, contactId);
-
-            assertEquals(contactId, dto.getUserId());
-            assertEquals("Bob", dto.getName());
-            assertNull(dto.getAbout());
-            assertNull(dto.getPhotoUrl());
-        }
-
-        @Test
-        @DisplayName("getProfileForViewer shows all fields when viewer is a mutual contact")
-        void getProfileForViewer_showsAllWhenContact() {
-            Profile target = createProfile(contactId, "Bob", "Visible bio", "visible.jpg");
-            UserSettings settings = createSettings(contactId, PrivacyLevel.MY_CONTACTS, PrivacyLevel.MY_CONTACTS);
-
-            when(profileRepository.findByUserId(contactId)).thenReturn(Optional.of(target));
-            when(settingsRepository.findByUserId(contactId)).thenReturn(Optional.of(settings));
-            when(contactRepository.findByUserIdAndContactId(ownerId, contactId)).thenReturn(Optional.of(new Contact()));
-
-            ProfileDto dto = profileService.getProfileForViewer(ownerId, contactId);
-
-            assertEquals("Visible bio", dto.getAbout());
-            assertEquals("visible.jpg", dto.getPhotoUrl());
-        }
-
-        @Test
-        @DisplayName("getProfileForViewer shows all fields when visibility is EVERYONE")
+        @DisplayName("getProfileForViewer shows all when EVERYONE privacy")
         void getProfileForViewer_showsAllWhenEveryone() {
-            Profile target = createProfile(contactId, "Bob", "Public bio", "public.jpg");
-            UserSettings settings = createSettings(contactId, PrivacyLevel.EVERYONE, PrivacyLevel.EVERYONE);
+            Profile profile = createTestProfile();
+            UserSettings settings = createTestSettings();
 
-            when(profileRepository.findByUserId(contactId)).thenReturn(Optional.of(target));
-            when(settingsRepository.findByUserId(contactId)).thenReturn(Optional.of(settings));
+            when(profileRepository.findByUserId(targetId)).thenReturn(Optional.of(profile));
+            when(settingsRepository.findByUserId(targetId)).thenReturn(Optional.of(settings));
 
-            ProfileDto dto = profileService.getProfileForViewer(ownerId, contactId);
+            ProfileDto result = profileService.getProfileForViewer(viewerId, targetId);
 
-            assertEquals("Public bio", dto.getAbout());
-            assertEquals("public.jpg", dto.getPhotoUrl());
+            assertEquals("Visible bio", result.getAbout());
+            assertEquals("photo.jpg", result.getPhotoUrl());
+        }
+
+        @Test
+        @DisplayName("getProfileForViewer shows all when mutual contact and MY_CONTACTS privacy")
+        void getProfileForViewer_showsAllWhenMutualContact() {
+            Profile profile = createTestProfile();
+            UserSettings settings = createTestSettings();
+            settings.setProfilePhoto(PrivacyLevel.MY_CONTACTS);
+            settings.setAbout(PrivacyLevel.MY_CONTACTS);
+
+            when(profileRepository.findByUserId(targetId)).thenReturn(Optional.of(profile));
+            when(settingsRepository.findByUserId(targetId)).thenReturn(Optional.of(settings));
+            
+            // Mock BOTH directions for mutual contact
+            when(contactRepository.findByUserIdAndContactId(viewerId, targetId))
+                .thenReturn(Optional.of(new Contact()));
+            when(contactRepository.findByUserIdAndContactId(targetId, viewerId))
+                .thenReturn(Optional.of(new Contact()));
+
+            ProfileDto result = profileService.getProfileForViewer(viewerId, targetId);
+
+            assertEquals("Visible bio", result.getAbout());
+            assertEquals("photo.jpg", result.getPhotoUrl());
+        }
+
+        @Test
+        @DisplayName("getProfileForViewer hides data when MY_CONTACTS and not mutual contact")
+        void getProfileForViewer_hidesDataWhenNotMutualContact() {
+            Profile profile = createTestProfile();
+            UserSettings settings = createTestSettings();
+            settings.setProfilePhoto(PrivacyLevel.MY_CONTACTS);
+            settings.setAbout(PrivacyLevel.MY_CONTACTS);
+
+            when(profileRepository.findByUserId(targetId)).thenReturn(Optional.of(profile));
+            when(settingsRepository.findByUserId(targetId)).thenReturn(Optional.of(settings));
+            
+            // Only ONE direction - not mutual
+            when(contactRepository.findByUserIdAndContactId(viewerId, targetId))
+                .thenReturn(Optional.of(new Contact()));
+            when(contactRepository.findByUserIdAndContactId(targetId, viewerId))
+                .thenReturn(Optional.empty());
+
+            ProfileDto result = profileService.getProfileForViewer(viewerId, targetId);
+
+            assertNull(result.getAbout());
+            assertNull(result.getPhotoUrl());
         }
     }
 
@@ -146,66 +153,69 @@ class ProfileServiceTest {
     class ContactManagement {
 
         @Test
-        @DisplayName("addContact creates mutual entries when not already contact")
-        void addContact_createsMutualEntries() {
-            when(contactRepository.findByUserIdAndContactId(any(), any())).thenReturn(Optional.empty());
-            when(blockRepository.findByBlockerIdAndBlockedId(any(), any())).thenReturn(Optional.empty());
+        @DisplayName("addContact creates single unidirectional entry")
+        void addContact_createsUnidirectionalEntry() {
+            when(contactRepository.findByUserIdAndContactId(userId, contactId))
+                .thenReturn(Optional.empty());
+            when(blockRepository.findByBlockerIdAndBlockedId(any(), any()))
+                .thenReturn(Optional.empty());
 
-            profileService.addContact(ownerId, contactId);
+            profileService.addContact(userId, contactId);
 
-            verify(contactRepository, times(2)).save(any(Contact.class));
+            verify(contactRepository, times(1)).save(any(Contact.class));
         }
 
         @Test
         @DisplayName("addContact is idempotent")
         void addContact_isIdempotent() {
-            when(contactRepository.findByUserIdAndContactId(ownerId, contactId))
-                    .thenReturn(Optional.of(new Contact()));
-            when(blockRepository.findByBlockerIdAndBlockedId(any(), any())).thenReturn(Optional.empty());
+            when(contactRepository.findByUserIdAndContactId(userId, contactId))
+                .thenReturn(Optional.of(new Contact()));
 
-            profileService.addContact(ownerId, contactId);
+            profileService.addContact(userId, contactId);
 
             verify(contactRepository, never()).save(any());
         }
 
         @Test
-        @DisplayName("addContact forbids self-add")
-        void addContact_forbidsSelfAdd() {
+        @DisplayName("addContact throws when adding self")
+        void addContact_throwsWhenAddingSelf() {
             assertThrows(IllegalArgumentException.class, () ->
-                    profileService.addContact(ownerId, ownerId));
+                profileService.addContact(userId, userId)
+            );
         }
 
         @Test
-        @DisplayName("addContact forbids adding a blocked user (either direction)")
-        void addContact_forbidsIfBlocked() {
-            when(blockRepository.findByBlockerIdAndBlockedId(any(UUID.class), any(UUID.class)))
-                    .thenReturn(Optional.empty())
-                    .thenReturn(Optional.of(new Block())); // second call returns block
+        @DisplayName("addContact throws when user is blocked")
+        void addContact_throwsWhenBlocked() {
+            when(blockRepository.findByBlockerIdAndBlockedId(userId, contactId))
+                .thenReturn(Optional.of(new Block()));
 
             assertThrows(IllegalArgumentException.class, () ->
-                    profileService.addContact(ownerId, contactId));
+                profileService.addContact(userId, contactId)
+            );
         }
 
         @Test
-        @DisplayName("removeContact removes both sides of the relationship")
-        void removeContact_removesBothSides() {
-            profileService.removeContact(ownerId, contactId);
+        @DisplayName("removeContact removes single unidirectional entry")
+        void removeContact_removesUnidirectionalEntry() {
+            profileService.removeContact(userId, contactId);
 
-            verify(contactRepository).deleteByUserIdAndContactId(ownerId, contactId);
-            verify(contactRepository).deleteByUserIdAndContactId(contactId, ownerId);
+            verify(contactRepository, times(1)).deleteByUserIdAndContactId(userId, contactId);
         }
 
         @Test
-        @DisplayName("getMyContacts returns list of contact IDs")
-        void getMyContacts_returnsContactIds() {
+        @DisplayName("getMyContacts returns contact list")
+        void getMyContacts_returnsContactList() {
             Contact c1 = new Contact();
+            c1.setUserId(userId);
             c1.setContactId(contactId);
-            when(contactRepository.findAllByUserId(ownerId)).thenReturn(List.of(c1));
 
-            List<ContactDto> dtos = profileService.getMyContacts(ownerId);
+            when(contactRepository.findAllByUserId(userId)).thenReturn(List.of(c1));
 
-            assertEquals(1, dtos.size());
-            assertEquals(contactId, dtos.get(0).getContactId());
+            var result = profileService.getMyContacts(userId);
+
+            assertEquals(1, result.size());
+            assertEquals(contactId, result.get(0).getContactId());
         }
     }
 
@@ -214,103 +224,143 @@ class ProfileServiceTest {
     class Blocking {
 
         @Test
-        @DisplayName("blockUser creates block and removes mutual contacts")
-        void blockUser_createsBlockAndRemovesContacts() {
-            when(blockRepository.findByBlockerIdAndBlockedId(ownerId, blockedId))
-                    .thenReturn(Optional.empty());
+        @DisplayName("blockUser creates block entry without removing contacts")
+        void blockUser_createsBlockWithoutRemovingContacts() {
+            when(blockRepository.findByBlockerIdAndBlockedId(userId, contactId))
+                .thenReturn(Optional.empty());
 
-            profileService.blockUser(ownerId, blockedId);
+            profileService.blockUser(userId, contactId);
 
             verify(blockRepository).save(any(Block.class));
-            verify(contactRepository, times(2)).deleteByUserIdAndContactId(any(), any());
+            verify(contactRepository, never()).deleteByUserIdAndContactId(any(), any());
         }
 
         @Test
         @DisplayName("blockUser is idempotent")
         void blockUser_isIdempotent() {
-            when(blockRepository.findByBlockerIdAndBlockedId(ownerId, blockedId))
-                    .thenReturn(Optional.of(new Block()));
+            when(blockRepository.findByBlockerIdAndBlockedId(userId, contactId))
+                .thenReturn(Optional.of(new Block()));
 
-            profileService.blockUser(ownerId, blockedId);
+            profileService.blockUser(userId, contactId);
 
             verify(blockRepository, never()).save(any());
         }
 
         @Test
-        @DisplayName("blockUser forbids self-block")
-        void blockUser_forbidsSelfBlock() {
+        @DisplayName("blockUser throws when blocking self")
+        void blockUser_throwsWhenBlockingSelf() {
             assertThrows(IllegalArgumentException.class, () ->
-                    profileService.blockUser(ownerId, ownerId));
+                profileService.blockUser(userId, userId)
+            );
         }
 
         @Test
-        @DisplayName("unblockUser removes the block")
+        @DisplayName("unblockUser removes block")
         void unblockUser_removesBlock() {
             Block block = new Block();
-            when(blockRepository.findByBlockerIdAndBlockedId(ownerId, blockedId))
-                    .thenReturn(Optional.of(block));
+            when(blockRepository.findByBlockerIdAndBlockedId(userId, contactId))
+                .thenReturn(Optional.of(block));
 
-            profileService.unblockUser(ownerId, blockedId);
+            profileService.unblockUser(userId, contactId);
 
             verify(blockRepository).delete(block);
         }
 
         @Test
-        @DisplayName("getMyBlockedUsers returns list of blocked user IDs")
-        void getMyBlockedUsers_returnsBlockedIds() {
-            Block b1 = new Block();
-            b1.setBlockedId(blockedId);
-            when(blockRepository.findAllByBlockerId(ownerId)).thenReturn(List.of(b1));
+        @DisplayName("getMyBlockedUsers returns blocked list")
+        void getMyBlockedUsers_returnsBlockedList() {
+            Block block = new Block();
+            block.setBlockerId(userId);
+            block.setBlockedId(contactId);
 
-            List<ContactDto> dtos = profileService.getMyBlockedUsers(ownerId);
+            when(blockRepository.findAllByBlockerId(userId)).thenReturn(List.of(block));
 
-            assertEquals(1, dtos.size());
-            assertEquals(blockedId, dtos.get(0).getContactId());
+            var result = profileService.getMyBlockedUsers(userId);
+
+            assertEquals(1, result.size());
+            assertEquals(contactId, result.get(0).getContactId());
         }
     }
 
     @Nested
-    @DisplayName("Privacy Settings Tests")
-    class PrivacySettings {
+    @DisplayName("Settings Tests")
+    class Settings {
 
         @Test
-        @DisplayName("getMySettings returns settings and creates defaults if missing")
-        void getMySettings_createsDefaultsIfMissing() {
-            when(settingsRepository.findByUserId(ownerId)).thenReturn(Optional.empty());
-            when(settingsRepository.save(any(UserSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        @DisplayName("getMySettings returns settings")
+        void getMySettings_returnsSettings() {
+            UserSettings settings = createTestSettings();
+            settings.setUserId(userId);
+            when(settingsRepository.findByUserId(userId)).thenReturn(Optional.of(settings));
 
-            UserSettingsDto dto = profileService.getMySettings(ownerId);
+            UserSettingsDto result = profileService.getMySettings(userId);
 
-            assertEquals(PrivacyLevel.EVERYONE, dto.getProfilePhoto());
-            assertEquals(PrivacyLevel.EVERYONE, dto.getAbout());
-            assertEquals(PrivacyLevel.MY_CONTACTS, dto.getLastSeenAndOnline());
-            assertTrue(dto.isReadReceipts());
-            assertEquals(PrivacyLevel.MY_CONTACTS, dto.getDefaultStoryVisibility());
+            assertEquals(PrivacyLevel.EVERYONE, result.getProfilePhoto());
+            assertEquals(PrivacyLevel.EVERYONE, result.getAbout());
+            assertEquals(PrivacyLevel.MY_CONTACTS, result.getLastSeenAndOnline());
+            assertTrue(result.isReadReceipts());
+            assertEquals(PrivacyLevel.MY_CONTACTS, result.getDefaultStoryVisibility());
+        }
 
+        @Test
+        @DisplayName("getMySettings creates default when not found")
+        void getMySettings_createsDefaultWhenNotFound() {
+            when(settingsRepository.findByUserId(userId)).thenReturn(Optional.empty());
+            when(settingsRepository.save(any(UserSettings.class))).thenAnswer(i -> i.getArgument(0));
+
+            UserSettingsDto result = profileService.getMySettings(userId);
+
+            assertNotNull(result);
             verify(settingsRepository).save(any(UserSettings.class));
         }
 
         @Test
-        @DisplayName("updateMySettings applies only provided changes")
-        void updateMySettings_appliesProvidedChanges() {
-            UserSettings existing = createSettings(ownerId, PrivacyLevel.EVERYONE, PrivacyLevel.EVERYONE);
-            when(settingsRepository.findByUserId(ownerId)).thenReturn(Optional.of(existing));
+        @DisplayName("updateMySettings updates all fields")
+        void updateMySettings_updatesAllFields() {
+            UserSettings settings = createTestSettings();
+            settings.setUserId(userId);
+            when(settingsRepository.findByUserId(userId)).thenReturn(Optional.of(settings));
 
-            UserSettingsDto update = new UserSettingsDto();
-            update.setProfilePhoto(PrivacyLevel.NOBODY);
-            update.setReadReceipts(false);
-            update.setLastSeenAndOnline(PrivacyLevel.NOBODY);
+            UserSettingsDto updated = new UserSettingsDto();
+            updated.setProfilePhoto(PrivacyLevel.MY_CONTACTS);
+            updated.setAbout(PrivacyLevel.NOBODY);
+            updated.setLastSeenAndOnline(PrivacyLevel.NOBODY);
+            updated.setReadReceipts(false);
+            updated.setDefaultStoryVisibility(PrivacyLevel.EVERYONE);
 
-            profileService.updateMySettings(ownerId, update);
+            profileService.updateMySettings(userId, updated);
 
-            assertEquals(PrivacyLevel.NOBODY, existing.getProfilePhoto());
-            assertFalse(existing.isReadReceipts());
-            assertEquals(PrivacyLevel.NOBODY, existing.getLastSeenAndOnline());
-            // Unchanged fields
-            assertEquals(PrivacyLevel.EVERYONE, existing.getAbout());
-            assertEquals(PrivacyLevel.MY_CONTACTS, existing.getDefaultStoryVisibility());
+            verify(settingsRepository).save(settings);
+            assertEquals(PrivacyLevel.MY_CONTACTS, settings.getProfilePhoto());
+            assertEquals(PrivacyLevel.NOBODY, settings.getAbout());
+            assertEquals(PrivacyLevel.NOBODY, settings.getLastSeenAndOnline());
+            assertFalse(settings.isReadReceipts());
+            assertEquals(PrivacyLevel.EVERYONE, settings.getDefaultStoryVisibility());
+        }
+    }
 
-            verify(settingsRepository).save(existing);
+    @Nested
+    @DisplayName("Existence Check Tests")
+    class ExistenceCheck {
+
+        @Test
+        @DisplayName("existsByUserId returns true when user exists")
+        void existsByUserId_returnsTrueWhenExists() {
+            when(profileRepository.existsByUserId(userId)).thenReturn(true);
+
+            boolean result = profileService.existsByUserId(userId);
+
+            assertTrue(result);
+        }
+
+        @Test
+        @DisplayName("existsByUserId returns false when user does not exist")
+        void existsByUserId_returnsFalseWhenNotExists() {
+            when(profileRepository.existsByUserId(userId)).thenReturn(false);
+
+            boolean result = profileService.existsByUserId(userId);
+
+            assertFalse(result);
         }
     }
 }

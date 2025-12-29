@@ -1,9 +1,9 @@
 package com.socialwallet.profiles.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.socialwallet.profiles.dto.ContactDto;
-import com.socialwallet.profiles.dto.MyProfileDto;
-import com.socialwallet.profiles.dto.ProfileDto;
+// import com.socialwallet.profiles.dto.ContactDto;
+// import com.socialwallet.profiles.dto.MyProfileDto;
+// import com.socialwallet.profiles.dto.ProfileDto;
 import com.socialwallet.profiles.dto.UserSettingsDto;
 import com.socialwallet.profiles.model.PrivacyLevel;
 import com.socialwallet.profiles.model.Profile;
@@ -23,7 +23,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.List;
+// import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
