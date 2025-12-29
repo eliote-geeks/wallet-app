@@ -39,17 +39,21 @@ public class ProfileService {
     public ProfileDto getProfileForViewer(UUID viewerId, UUID targetId) {
         Profile profile = getProfileEntity(targetId);
         UserSettings settings = getSettings(targetId);
-        boolean isContact = isMutualContact(viewerId, targetId);
+        boolean isMutualContact = isMutualContact(viewerId, targetId);  // ← RENOMMÉ pour clarté
 
         ProfileDto dto = new ProfileDto();
         dto.setUserId(profile.getUserId());
         dto.setName(profile.getName());
 
-        if (settings.getProfilePhoto() == PrivacyLevel.EVERYONE || isContact) {
+        // Photo visible si EVERYONE OU (MY_CONTACTS et contact mutuel)
+        if (settings.getProfilePhoto() == PrivacyLevel.EVERYONE ||
+            (settings.getProfilePhoto() == PrivacyLevel.MY_CONTACTS && isMutualContact)) {
             dto.setPhotoUrl(profile.getPhotoUrl());
         }
 
-        if (settings.getAbout() == PrivacyLevel.EVERYONE || isContact) {
+        // About visible si EVERYONE OU (MY_CONTACTS et contact mutuel)
+        if (settings.getAbout() == PrivacyLevel.EVERYONE ||
+            (settings.getAbout() == PrivacyLevel.MY_CONTACTS && isMutualContact)) {
             dto.setAbout(profile.getAbout());
         }
 
@@ -87,13 +91,11 @@ public class ProfileService {
         }
 
         contactRepository.save(createContact(userId, contactId));
-        contactRepository.save(createContact(contactId, userId));
     }
 
     @Transactional
     public void removeContact(UUID userId, UUID contactId) {
         contactRepository.deleteByUserIdAndContactId(userId, contactId);
-        contactRepository.deleteByUserIdAndContactId(contactId, userId);
     }
 
     @Transactional
@@ -107,7 +109,6 @@ public class ProfileService {
         }
 
         blockRepository.save(createBlock(blockerId, blockedId));
-        removeContact(blockerId, blockedId);
     }
 
     @Transactional
@@ -176,8 +177,18 @@ public class ProfileService {
                 .orElseGet(() -> createDefaultSettings(userId));
     }
 
-    private boolean isMutualContact(UUID a, UUID b) {
-        return contactRepository.findByUserIdAndContactId(a, b).isPresent();
+    /**
+     * Checks if two users are MUTUAL contacts.
+     * Returns true ONLY if BOTH users have added each other.
+     * 
+     * @param userId1 First user ID
+     * @param userId2 Second user ID
+     * @return true if both have added each other, false otherwise
+     */
+    private boolean isMutualContact(UUID userId1, UUID userId2) {
+        boolean user1HasUser2 = contactRepository.findByUserIdAndContactId(userId1, userId2).isPresent();
+        boolean user2HasUser1 = contactRepository.findByUserIdAndContactId(userId2, userId1).isPresent();
+        return user1HasUser2 && user2HasUser1;  // ← LES DEUX doivent être vrais
     }
 
     private Contact createContact(UUID userId, UUID contactId) {
