@@ -9,6 +9,10 @@ Le code serveur Medusa est dans `infra/medusa/server` (starter officiel).
 cd infra/medusa
 cp .env.example .env
 
+cd server
+npm install
+
+cd ..
 docker compose up -d medusa-db medusa-redis
 
 docker compose run --rm medusa yarn medusa db:migrate
