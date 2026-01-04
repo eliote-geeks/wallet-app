@@ -18,6 +18,9 @@ public class UserAccount {
   @Column(name = "phone_number", length = 32, unique = true)
   private String phoneNumber;
 
+  @Column(name = "openim_user_id", unique = true)
+  private Long openimUserId;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 30)
   private AccountStatus status = AccountStatus.PENDING_VERIFICATION;

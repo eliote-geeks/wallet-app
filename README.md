@@ -48,7 +48,14 @@ docker compose up -d
 - Messagerie: stack OpenIM ajoutee dans `infra/openim` (compose + config + .env.example).
 - Services exposes (dev): 10001 (IM WS), 10002 (OpenIM API), 10008 (Chat API), 10009 (Admin API), 11001 (OpenIM Web), 10005 (MinIO).
 - Front OpenIM: http://localhost:11001 (double-clic sur le titre pour configurer IMWsUrl/IMApiUrl/ChatUrl).
-- Integration Spring Boot <-> OpenIM: a faire (pour l instant services separes).
+- Integration Spring Boot <-> OpenIM: provisionnement auto + endpoint tokens `/api/messaging/token`.
+
+## OpenIM (backend)
+Variables utiles (dev):
+- `OPENIM_CHAT_URL` (default `http://localhost:10008`)
+- `OPENIM_ADMIN_URL` (default `http://localhost:10009`)
+- `OPENIM_ADMIN_ACCOUNT` / `OPENIM_ADMIN_PASSWORD_HASH` (defaut `chatAdmin` / md5)
+- `OPENIM_PASSWORD_SALT` (sel pour generer le mot de passe OpenIM des users)
 
 ## Configuration Keycloak (dev)
 1. Ouvre Keycloak (http://localhost:8082)

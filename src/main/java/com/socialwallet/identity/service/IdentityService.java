@@ -1,5 +1,8 @@
 package com.socialwallet.identity.service;
 
+import com.socialwallet.chat.OpenImException;
+import com.socialwallet.chat.service.OpenImService;
+import com.socialwallet.chat.service.OpenImUserIdService;
 import com.socialwallet.identity.IdentityException;
 import com.socialwallet.identity.IdentityProperties;
 import com.socialwallet.identity.dto.*;
@@ -21,6 +24,8 @@ public class IdentityService {
   private final KeycloakAdminClient keycloakAdminClient;
   private final KeycloakTokenClient keycloakTokenClient;
   private final IdentityProperties properties;
+  private final OpenImService openImService;
+  private final OpenImUserIdService openImUserIdService;
 
   public RegisterResponse register(RegisterRequest request) {
     String email = normalize(request.getEmail());
@@ -69,9 +74,15 @@ public class IdentityService {
     account.setId(userId);
     account.setEmail(email);
     account.setPhoneNumber(phone);
+    account.setOpenimUserId(openImUserIdService.nextId());
     account.setStatus(AccountStatus.ACTIVE);
     account.setVerifiedAt(Instant.now());
     userAccountRepository.save(account);
+    try {
+      openImService.ensureProvisioned(account);
+    } catch (OpenImException ex) {
+      throw new IdentityException(HttpStatus.BAD_GATEWAY, "OpenIM provisioning failed: " + ex.getMessage());
+    }
 
     return keycloakTokenClient.passwordGrant(username, request.getPassword());
   }
@@ -114,6 +125,7 @@ public class IdentityService {
     account.setId(userId);
     account.setEmail(jwt.getClaimAsString("email"));
     account.setPhoneNumber(jwt.getClaimAsString("phone_number"));
+    account.setOpenimUserId(openImUserIdService.nextId());
     account.setStatus(AccountStatus.ACTIVE);
     account.setVerifiedAt(Instant.now());
     return userAccountRepository.save(account);
