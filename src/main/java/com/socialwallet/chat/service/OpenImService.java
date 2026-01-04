@@ -15,6 +15,7 @@ import org.springframework.util.DigestUtils;
 @RequiredArgsConstructor
 public class OpenImService {
   private static final int ACCOUNT_NOT_FOUND = 20002;
+  private static final int ARGS_ERROR = 1001;
   private static final Set<Integer> REGISTER_CONFLICT_CODES = Set.of(20003, 20004, 20014);
 
   private final OpenImClient client;
@@ -66,6 +67,26 @@ public class OpenImService {
     return response;
   }
 
+  public void repairUser(UserAccount account) {
+    if (!properties.isEnabled()) {
+      return;
+    }
+    if (account.getOpenimUserId() == null) {
+      throw new OpenImException(HttpStatus.INTERNAL_SERVER_ERROR, "OpenIM user id is missing");
+    }
+    OpenImClient.UpdateUserRequest request = buildUpdateUserRequest(account);
+    try {
+      client.updateUserInfo(request);
+    } catch (OpenImException ex) {
+      if (isUserMissing(ex)) {
+        ensureProvisioned(account);
+        client.updateUserInfo(request);
+        return;
+      }
+      throw ex;
+    }
+  }
+
   private OpenImClient.RegisterRequest buildRegisterRequest(UserAccount account, boolean autoLogin) {
     OpenImClient.RegisterUserInfo userInfo = new OpenImClient.RegisterUserInfo();
     String openImUserId = String.valueOf(account.getOpenimUserId());
@@ -83,6 +104,18 @@ public class OpenImService {
     request.setPlatform(properties.getPlatform());
     request.setAutoLogin(autoLogin);
     request.setUser(userInfo);
+    return request;
+  }
+
+  private OpenImClient.UpdateUserRequest buildUpdateUserRequest(UserAccount account) {
+    OpenImClient.UpdateUserRequest request = new OpenImClient.UpdateUserRequest();
+    String openImUserId = String.valueOf(account.getOpenimUserId());
+    request.setUserId(openImUserId);
+    request.setAccount(deriveAccount(account.getOpenimUserId()));
+    request.setNickname(resolveNickname(account));
+    request.setEmail(account.getEmail());
+    request.setAreaCode(properties.getDefaultAreaCode());
+    request.setPhoneNumber(openImUserId);
     return request;
   }
 
@@ -154,6 +187,14 @@ public class OpenImService {
 
   private String digitsOnly(String value) {
     return value.replaceAll("\\D", "");
+  }
+
+  private boolean isUserMissing(OpenImException ex) {
+    if (ex.getErrCode() == ACCOUNT_NOT_FOUND) {
+      return true;
+    }
+    String detail = ex.getErrDetail();
+    return ex.getErrCode() == ARGS_ERROR && detail != null && detail.toLowerCase().contains("user not found");
   }
 
   private record PhoneParts(String areaCode, String number) {}

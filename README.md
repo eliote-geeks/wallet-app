@@ -56,6 +56,20 @@ Variables utiles (dev):
 - `OPENIM_ADMIN_URL` (default `http://localhost:10009`)
 - `OPENIM_ADMIN_ACCOUNT` / `OPENIM_ADMIN_PASSWORD_HASH` (defaut `chatAdmin` / md5)
 - `OPENIM_PASSWORD_SALT` (sel pour generer le mot de passe OpenIM des users)
+- `OPENIM_REPAIR_ON_STARTUP` (repare les comptes OpenIM existants au demarrage)
+
+### Reparer les anciens comptes OpenIM
+Si des comptes ont ete crees avant le mapping `openim_user_id` -> `phoneNumber`,
+OpenIM refusera le login (areaCode/phone manquants). Pour corriger:
+
+```bash
+OPENIM_REPAIR_ON_STARTUP=true \
+OPENIM_PASSWORD_SALT=dev-openim-salt \
+./mvnw -DskipTests spring-boot:run
+```
+
+Le job met a jour `phoneNumber`/`areaCode` dans OpenIM en utilisant le `openim_user_id`.
+Desactive ensuite en supprimant `OPENIM_REPAIR_ON_STARTUP`.
 
 ## Configuration Keycloak (dev)
 1. Ouvre Keycloak (http://localhost:8082)

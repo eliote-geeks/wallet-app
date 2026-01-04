@@ -70,6 +70,15 @@ public class OpenImClient {
     );
   }
 
+  public void updateUserInfo(UpdateUserRequest request) {
+    post(
+      properties.getChatBaseUrl() + "/user/update",
+      request,
+      getAdminToken(),
+      new ParameterizedTypeReference<OpenImResponse<Object>>() {}
+    );
+  }
+
   private <T> T post(
     String url,
     Object payload,
@@ -159,6 +168,19 @@ public class OpenImClient {
     private int platform;
     private String deviceID;
     private String ip;
+    private String areaCode;
+    private String phoneNumber;
+    private String email;
+  }
+
+  @Data
+  public static class UpdateUserRequest {
+    @JsonProperty("userID")
+    private String userId;
+    private String account;
+    private String nickname;
+    @JsonProperty("faceURL")
+    private String faceUrl;
     private String areaCode;
     private String phoneNumber;
     private String email;
