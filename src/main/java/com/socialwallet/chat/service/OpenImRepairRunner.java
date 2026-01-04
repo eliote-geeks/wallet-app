@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 public class OpenImRepairRunner implements ApplicationRunner {
   private final UserAccountRepository userAccountRepository;
   private final OpenImService openImService;
+  private final OpenImUserIdService openImUserIdService;
 
   @Override
   public void run(ApplicationArguments args) {
@@ -29,11 +30,9 @@ public class OpenImRepairRunner implements ApplicationRunner {
     int repaired = 0;
     int failed = 0;
     for (UserAccount account : accounts) {
-      if (account.getOpenimUserId() == null) {
-        continue;
-      }
       try {
-        openImService.repairUser(account);
+        UserAccount target = openImUserIdService.assignIfMissing(account);
+        openImService.repairUser(target);
         repaired++;
       } catch (OpenImException ex) {
         failed++;

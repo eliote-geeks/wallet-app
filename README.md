@@ -71,6 +71,10 @@ OPENIM_PASSWORD_SALT=dev-openim-salt \
 Le job met a jour `phoneNumber`/`areaCode` dans OpenIM en utilisant le `openim_user_id`.
 Desactive ensuite en supprimant `OPENIM_REPAIR_ON_STARTUP`.
 
+Alternative (admin API):
+- `POST /api/admin/openim/repair` (role `ADMIN` requis)
+- Optionnel: `?userId=<uuid>` pour cibler un seul compte
+
 ## Configuration Keycloak (dev)
 1. Ouvre Keycloak (http://localhost:8082)
 2. Login admin: `admin` / `admin`
