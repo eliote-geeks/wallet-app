@@ -54,17 +54,17 @@ public class OpenImService {
       token = client.loginUser(buildLoginRequest(account));
     } catch (OpenImException ex) {
       if (ex.getErrCode() != ACCOUNT_NOT_FOUND) {
-        throw ex;
+        if (!isRepairableLoginError(ex)) {
+          throw ex;
+        }
+        repairUser(account);
+        token = client.loginUser(buildLoginRequest(account));
+        return buildResponse(account, token);
       }
       ensureProvisioned(account);
       token = client.loginUser(buildLoginRequest(account));
     }
-    MessagingTokenResponse response = new MessagingTokenResponse();
-    response.setUserId(account.getId().toString());
-    response.setOpenimUserId(token.getUserId());
-    response.setImToken(token.getImToken());
-    response.setChatToken(token.getChatToken());
-    return response;
+    return buildResponse(account, token);
   }
 
   public void repairUser(UserAccount account) {
@@ -189,12 +189,34 @@ public class OpenImService {
     return value.replaceAll("\\D", "");
   }
 
+  private boolean isRepairableLoginError(OpenImException ex) {
+    if (isUserMissing(ex)) {
+      return true;
+    }
+    String detail = ex.getErrDetail();
+    if (detail == null) {
+      return false;
+    }
+    String normalized = detail.toLowerCase();
+    return normalized.contains("areacode is empty")
+      || normalized.contains("phonenumber is empty");
+  }
+
   private boolean isUserMissing(OpenImException ex) {
     if (ex.getErrCode() == ACCOUNT_NOT_FOUND) {
       return true;
     }
     String detail = ex.getErrDetail();
     return ex.getErrCode() == ARGS_ERROR && detail != null && detail.toLowerCase().contains("user not found");
+  }
+
+  private MessagingTokenResponse buildResponse(UserAccount account, OpenImClient.TokenResponse token) {
+    MessagingTokenResponse response = new MessagingTokenResponse();
+    response.setUserId(account.getId().toString());
+    response.setOpenimUserId(token.getUserId());
+    response.setImToken(token.getImToken());
+    response.setChatToken(token.getChatToken());
+    return response;
   }
 
   private record PhoneParts(String areaCode, String number) {}

@@ -75,6 +75,9 @@ Alternative (admin API):
 - `POST /api/admin/openim/repair` (role `ADMIN` requis)
 - Optionnel: `?userId=<uuid>` pour cibler un seul compte
 
+Note: l API tente aussi une auto-reparation lors du login OpenIM si
+`areaCode`/`phoneNumber` sont manquants.
+
 ## Configuration Keycloak (dev)
 1. Ouvre Keycloak (http://localhost:8082)
 2. Login admin: `admin` / `admin`
