@@ -6,6 +6,7 @@
 *.iml
 .idea/
 .vscode/
+node_modules/
 
 # OS
 .DS_Store

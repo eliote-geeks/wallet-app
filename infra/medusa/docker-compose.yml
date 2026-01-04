@@ -1,0 +1,43 @@
+services:
+  medusa-db:
+    image: postgres:16
+    container_name: medusa-db
+    environment:
+      POSTGRES_DB: medusa_store
+      POSTGRES_USER: medusa
+      POSTGRES_PASSWORD: medusa
+    ports:
+      - "5433:5432"
+    volumes:
+      - medusa-db-data:/var/lib/postgresql/data
+
+  medusa-redis:
+    image: redis:7
+    container_name: medusa-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - medusa-redis-data:/data
+
+  medusa:
+    image: node:20-bookworm-slim
+    container_name: medusa-server
+    working_dir: /app
+    command: sh -c "corepack enable && yarn install --frozen-lockfile && yarn dev"
+    environment:
+      NODE_ENV: development
+    env_file:
+      - .env
+    volumes:
+      - ./server:/app
+      - medusa-node-modules:/app/node_modules
+    ports:
+      - "9000:9000"
+    depends_on:
+      - medusa-db
+      - medusa-redis
+
+volumes:
+  medusa-db-data:
+  medusa-redis-data:
+  medusa-node-modules:

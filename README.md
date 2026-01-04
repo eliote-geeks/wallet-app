@@ -20,6 +20,7 @@ Ce projet est un squelette Spring Boot monolithique avec une architecture modula
 - `chat`: conversations, messages
 - `wallet`: ledger, balances
 - `payments`: providers, webhooks
+- `store`: commerce (service Medusa)
 - `notifications`: push/email/SMS
 - `moderation`: moderation + trust
 - `admin`: backoffice
@@ -44,11 +45,21 @@ cd infra/openim
 docker compose up -d
 ```
 
+## Store (Medusa)
+Service Medusa dans `infra/medusa`.
+
+```bash
+cd infra/medusa
+cp .env.example .env
+docker compose up -d
+```
+
 ## Avancements
 - Messagerie: stack OpenIM ajoutee dans `infra/openim` (compose + config + .env.example).
 - Services exposes (dev): 10001 (IM WS), 10002 (OpenIM API), 10008 (Chat API), 10009 (Admin API), 11001 (OpenIM Web), 10005 (MinIO).
 - Front OpenIM: http://localhost:11001 (double-clic sur le titre pour configurer IMWsUrl/IMApiUrl/ChatUrl).
 - Integration Spring Boot <-> OpenIM: provisionnement auto + endpoint tokens `/api/messaging/token`.
+- Store: Medusa ajoute dans `infra/medusa` (compose + .env.example + server starter).
 
 ## OpenIM (backend)
 Variables utiles (dev):
