@@ -36,6 +36,21 @@ app:
     allowed-issuers:
       - ${KEYCLOAK_ISSUER_EXTERNAL:http://localhost:8082/realms/social-wallet}
       - ${KEYCLOAK_ISSUER_INTERNAL:http://keycloak:8080/realms/social-wallet}
+  identity:
+    keycloak:
+      base-url: ${KEYCLOAK_URL:http://localhost:8082}
+      realm: ${KEYCLOAK_REALM:social-wallet}
+      admin-realm: ${KEYCLOAK_ADMIN_REALM:master}
+      admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
+      admin-username: ${KEYCLOAK_ADMIN_USERNAME:admin}
+      admin-password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+      client-id: ${KEYCLOAK_CLIENT_ID:social-wallet-api}
+      client-secret: ${KEYCLOAK_CLIENT_SECRET:}
+      default-role: ${KEYCLOAK_DEFAULT_ROLE:USER}
+    otp:
+      ttl-seconds: ${OTP_TTL_SECONDS:300}
+      max-attempts: ${OTP_MAX_ATTEMPTS:3}
+      debug: ${OTP_DEBUG:true}
 
 management:
   endpoints:
