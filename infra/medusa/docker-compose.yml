@@ -15,7 +15,7 @@ services:
     image: redis:7
     container_name: medusa-redis
     ports:
-      - "6380:6379"
+      - "6381:6379"
     volumes:
       - medusa-redis-data:/data
 
@@ -23,14 +23,14 @@ services:
     image: node:20-bookworm-slim
     container_name: medusa-server
     working_dir: /app
-    command: sh -c "corepack enable && yarn install --frozen-lockfile && yarn dev"
+    command: sh -c "corepack enable && yarn dev"
     environment:
       NODE_ENV: development
     env_file:
       - .env
     volumes:
       - ./server:/app
-      - medusa-node-modules:/app/node_modules
+      - ./server/node_modules:/app/node_modules
     ports:
       - "9000:9000"
     depends_on:
@@ -40,4 +40,3 @@ services:
 volumes:
   medusa-db-data:
   medusa-redis-data:
-  medusa-node-modules:

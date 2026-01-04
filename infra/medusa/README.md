@@ -22,6 +22,6 @@ docker compose up -d medusa
 - API Medusa: http://localhost:9000
 
 ## Notes
-- Les ports 5433 (Postgres) et 6380 (Redis) evitent les conflits locaux.
+- Les ports 5433 (Postgres) et 6381 (Redis) evitent les conflits locaux.
 - L admin Medusa et l integration Keycloak seront ajustes plus tard.
 - Pour arreter: `docker compose down`.
