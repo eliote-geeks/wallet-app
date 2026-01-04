@@ -16,6 +16,7 @@ import org.springframework.util.DigestUtils;
 public class OpenImService {
   private static final int ACCOUNT_NOT_FOUND = 20002;
   private static final int ARGS_ERROR = 1001;
+  private static final int RECORD_NOT_FOUND = 1004;
   private static final Set<Integer> REGISTER_CONFLICT_CODES = Set.of(20003, 20004, 20014);
 
   private final OpenImClient client;
@@ -204,6 +205,9 @@ public class OpenImService {
 
   private boolean isUserMissing(OpenImException ex) {
     if (ex.getErrCode() == ACCOUNT_NOT_FOUND) {
+      return true;
+    }
+    if (ex.getErrCode() == RECORD_NOT_FOUND) {
       return true;
     }
     String detail = ex.getErrDetail();
