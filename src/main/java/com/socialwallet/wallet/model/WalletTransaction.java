@@ -8,31 +8,27 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Data;
 
 @Entity
-@Table(
-  name = "wallet_holds",
-  uniqueConstraints = {
-    @UniqueConstraint(name = "uq_wallet_holds_user_cart", columnNames = {"user_id", "cart_id"})
-  }
-)
+@Table(name = "wallet_transactions")
 @Data
-public class WalletHold {
+public class WalletTransaction {
   @Id
   private UUID id;
 
   @Column(name = "user_id", nullable = false)
   private UUID userId;
 
-  @Column(name = "account_id", nullable = false)
-  private UUID accountId;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "type", nullable = false, length = 30)
+  private WalletTransactionType type;
 
-  @Column(name = "cart_id", nullable = false, length = 64)
-  private String cartId;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "status", nullable = false, length = 20)
+  private WalletTransactionStatus status;
 
   @Column(name = "currency_code", nullable = false, length = 10)
   private String currencyCode;
@@ -40,12 +36,14 @@ public class WalletHold {
   @Column(name = "amount", nullable = false)
   private Long amount;
 
-  @Enumerated(EnumType.STRING)
-  @Column(name = "status", nullable = false, length = 20)
-  private WalletHoldStatus status;
+  @Column(name = "reference_type", length = 30)
+  private String referenceType;
 
-  @Column(name = "failure_reason", length = 500)
-  private String failureReason;
+  @Column(name = "reference_id", length = 64)
+  private String referenceId;
+
+  @Column(name = "metadata", columnDefinition = "jsonb")
+  private String metadata;
 
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;

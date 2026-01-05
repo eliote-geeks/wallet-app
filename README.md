@@ -114,10 +114,14 @@ Le JWK set est lu sur:
 - Prive: `GET /api/private/me` (necessite JWT)
 
 ## Wallet (dev)
-- `GET /api/wallet/balance` (JWT requis)
+- `GET /api/wallet/balance` (JWT requis) -> liste des soldes par devise
+- `GET /api/wallet/balance/{currency}` (JWT requis)
 - `POST /api/wallet/topup` (JWT requis) payload: `{ "amount": 15000, "currency": "XAF" }`
+- `POST /api/wallet/withdraw` (JWT requis) payload: `{ "amount": 5000, "currency": "XAF", "destination": "momo" }`
+- `POST /api/wallet/transfer` (JWT requis) payload: `{ "recipientId": "<uuid>", "amount": 2500, "currency": "XAF" }`
+- `GET /api/wallet/transactions` (JWT requis)
 - Checkout wallet: `POST /api/store/carts/{cartId}/complete` payload: `{ "payment_method": "wallet" }`
-- La devise du wallet est fixee au premier topup/checkout et doit matcher la devise du cart Medusa.
+- Le wallet supporte plusieurs devises (un compte par devise) ; la devise doit matcher celle du cart Medusa.
 
 ## i18n (FR par defaut)
 - Langues supportees: `fr`, `en`

@@ -11,11 +11,18 @@ import java.util.UUID;
 import lombok.Data;
 
 @Entity
-@Table(name = "wallet_accounts")
+@Table(
+  name = "wallet_accounts",
+  uniqueConstraints = {
+    @jakarta.persistence.UniqueConstraint(name = "uq_wallet_accounts_user_currency", columnNames = {"user_id", "currency_code"})
+  }
+)
 @Data
 public class WalletAccount {
   @Id
-  @Column(name = "user_id")
+  private UUID id;
+
+  @Column(name = "user_id", nullable = false)
   private UUID userId;
 
   @Column(name = "currency_code", nullable = false, length = 10)
@@ -35,6 +42,9 @@ public class WalletAccount {
 
   @PrePersist
   protected void onCreate() {
+    if (id == null) {
+      id = UUID.randomUUID();
+    }
     Instant now = Instant.now();
     createdAt = now;
     updatedAt = now;
