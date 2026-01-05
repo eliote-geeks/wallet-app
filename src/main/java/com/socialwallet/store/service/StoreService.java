@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.socialwallet.store.StoreException;
 import com.socialwallet.store.model.StoreCustomerMapping;
 import com.socialwallet.store.repository.StoreCustomerMappingRepository;
+import com.socialwallet.wallet.WalletException;
 import com.socialwallet.wallet.application.WalletPaymentService;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
@@ -17,6 +19,7 @@ import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StoreService {
   private final MedusaClient medusaClient;
   private final StoreCustomerMappingRepository mappingRepository;
@@ -111,8 +114,30 @@ public class StoreService {
     JsonNode cartNode = cartResponse.path("cart");
     String currency = cartNode.path("currency_code").asText(null);
     Long amount = cartNode.path("total").isNumber() ? cartNode.path("total").asLong() : null;
-    walletPaymentService.authorize(userId, cartId, currency, amount);
-    return medusaClient.postStore("/store/carts/" + cartId + "/complete");
+    try {
+      walletPaymentService.authorize(userId, cartId, currency, amount);
+    } catch (WalletException ex) {
+      throw new StoreException(ex.getStatus(), ex.getMessage());
+    }
+
+    JsonNode response;
+    try {
+      response = medusaClient.postStore("/store/carts/" + cartId + "/complete");
+    } catch (RuntimeException ex) {
+      try {
+        walletPaymentService.release(userId, cartId, ex.getMessage());
+      } catch (WalletException walletEx) {
+        log.warn("Wallet release failed after Medusa error: cartId={}, reason={}", cartId, walletEx.getMessage());
+      }
+      throw ex;
+    }
+
+    try {
+      walletPaymentService.capture(userId, cartId);
+    } catch (WalletException ex) {
+      log.warn("Wallet capture failed after Medusa success: cartId={}, reason={}", cartId, ex.getMessage());
+    }
+    return response;
   }
 
   private void attachCustomer(UUID userId, String email, Map<String, Object> body) {

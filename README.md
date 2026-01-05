@@ -60,6 +60,7 @@ docker compose up -d
 - Front OpenIM: http://localhost:11001 (double-clic sur le titre pour configurer IMWsUrl/IMApiUrl/ChatUrl).
 - Integration Spring Boot <-> OpenIM: provisionnement auto + endpoint tokens `/api/messaging/token`.
 - Store: Medusa ajoute dans `infra/medusa` (compose + .env.example + server starter).
+- Wallet: comptes + holds pour le checkout via wallet (tables `wallet_accounts`, `wallet_holds`).
 
 ## OpenIM (backend)
 Variables utiles (dev):
@@ -111,6 +112,12 @@ Le JWK set est lu sur:
 ## Endpoints de test
 - Public: `GET /api/public/ping`
 - Prive: `GET /api/private/me` (necessite JWT)
+
+## Wallet (dev)
+- `GET /api/wallet/balance` (JWT requis)
+- `POST /api/wallet/topup` (JWT requis) payload: `{ "amount": 15000, "currency": "XAF" }`
+- Checkout wallet: `POST /api/store/carts/{cartId}/complete` payload: `{ "payment_method": "wallet" }`
+- La devise du wallet est fixee au premier topup/checkout et doit matcher la devise du cart Medusa.
 
 ## i18n (FR par defaut)
 - Langues supportees: `fr`, `en`
