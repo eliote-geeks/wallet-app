@@ -61,6 +61,7 @@ docker compose up -d
 - Integration Spring Boot <-> OpenIM: provisionnement auto + endpoint tokens `/api/messaging/token`.
 - Store: Medusa ajoute dans `infra/medusa` (compose + .env.example + server starter).
 - Wallet: comptes + holds pour le checkout via wallet (tables `wallet_accounts`, `wallet_holds`).
+- Seed Medusa configure en XAF (region Central Africa, pays CM).
 
 ## OpenIM (backend)
 Variables utiles (dev):
@@ -122,6 +123,11 @@ Le JWK set est lu sur:
 - `GET /api/wallet/transactions` (JWT requis)
 - Checkout wallet: `POST /api/store/carts/{cartId}/complete` payload: `{ "payment_method": "wallet" }`
 - Le wallet supporte plusieurs devises (un compte par devise) ; la devise doit matcher celle du cart Medusa.
+
+## Mobile Money (placeholder)
+- `POST /api/payments/mobile-money/topups` (JWT requis) payload: `{ "amount": 15000, "currency": "XAF", "phoneNumber": "+237...", "provider": "mtn" }`
+- `POST /api/payments/mobile-money/withdrawals` (JWT requis) payload: `{ "amount": 5000, "currency": "XAF", "phoneNumber": "+237...", "provider": "mtn" }`
+- `POST /api/webhooks/mobile-money` (public) payload: `{ "transactionId": "<uuid>", "type": "TOPUP|WITHDRAW", "status": "SUCCESS|FAILED" }`
 
 ## i18n (FR par defaut)
 - Langues supportees: `fr`, `en`

@@ -27,5 +27,6 @@ docker compose up -d medusa
 
 ## Notes
 - Les ports 5433 (Postgres) et 6381 (Redis) evitent les conflits locaux.
+- Le seed configure une region XAF (Central Africa, CM) et des prix en XAF.
 - L admin Medusa et l integration Keycloak seront ajustes plus tard.
 - Pour arreter: `docker compose down`.

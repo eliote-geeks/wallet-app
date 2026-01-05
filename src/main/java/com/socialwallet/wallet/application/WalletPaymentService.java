@@ -39,6 +39,7 @@ public class WalletPaymentService {
   private final WalletTransactionRepository transactionRepository;
   private final WalletEntryRepository entryRepository;
   private final UserAccountRepository userAccountRepository;
+  private static final UUID SYSTEM_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000000");
 
   @Transactional
   public WalletHold authorize(UUID userId, String cartId, String currency, Long amount) {
@@ -56,13 +57,10 @@ public class WalletPaymentService {
       }
     }
 
-    if (account.getAvailableAmount() < amount) {
+    long availableBalance = balanceFor(account, WalletEntryBalanceType.AVAILABLE);
+    if (availableBalance < amount) {
       throw new WalletException(HttpStatus.BAD_REQUEST, "Insufficient wallet balance");
     }
-
-    account.setAvailableAmount(account.getAvailableAmount() - amount);
-    account.setReservedAmount(account.getReservedAmount() + amount);
-    accountRepository.save(account);
 
     WalletHold hold = existing != null ? existing : new WalletHold();
     hold.setUserId(userId);
@@ -99,9 +97,8 @@ public class WalletPaymentService {
 
     WalletAccount account = accountRepository.findForUpdateById(hold.getAccountId())
       .orElseThrow(() -> new WalletException(HttpStatus.NOT_FOUND, "Wallet account not found"));
+    WalletAccount systemAccount = getOrCreateAccount(SYSTEM_USER_ID, hold.getCurrencyCode());
     Long amount = hold.getAmount();
-    account.setReservedAmount(account.getReservedAmount() - amount);
-    accountRepository.save(account);
 
     hold.setStatus(WalletHoldStatus.CAPTURED);
     WalletHold saved = holdRepository.save(hold);
@@ -109,6 +106,7 @@ public class WalletPaymentService {
     WalletTransaction tx = recordTransaction(userId, WalletTransactionType.CAPTURE, WalletTransactionStatus.COMPLETED,
       hold.getCurrencyCode(), amount, "CART", cartId, null);
     recordEntry(tx, account, WalletEntryBalanceType.RESERVED, WalletEntryDirection.DEBIT, amount, "Capture funds");
+    recordEntry(tx, systemAccount, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.CREDIT, amount, "Capture funds");
 
     log.info("Wallet captured: userId={}, cartId={}, amount={}", userId, cartId, amount);
     return saved;
@@ -132,9 +130,6 @@ public class WalletPaymentService {
     WalletAccount account = accountRepository.findForUpdateById(hold.getAccountId())
       .orElseThrow(() -> new WalletException(HttpStatus.NOT_FOUND, "Wallet account not found"));
     Long amount = hold.getAmount();
-    account.setReservedAmount(account.getReservedAmount() - amount);
-    account.setAvailableAmount(account.getAvailableAmount() + amount);
-    accountRepository.save(account);
 
     hold.setStatus(WalletHoldStatus.RELEASED);
     hold.setFailureReason(reason != null && reason.length() > 500 ? reason.substring(0, 500) : reason);
@@ -151,37 +146,140 @@ public class WalletPaymentService {
 
   @Transactional
   public WalletBalanceDto topUp(UUID userId, String currency, Long amount) {
+    WalletTransaction tx = createPendingTopup(userId, currency, amount, "MANUAL", null);
+    return completePendingTopup(tx.getId());
+  }
+
+  @Transactional
+  public WalletTransaction createPendingTopup(UUID userId,
+                                              String currency,
+                                              Long amount,
+                                              String provider,
+                                              String referenceId) {
     validateInput(userId, "topup", currency, amount);
     String normalizedCurrency = normalizeCurrency(currency);
-    WalletAccount account = getOrCreateAccount(userId, normalizedCurrency);
-    account.setAvailableAmount(account.getAvailableAmount() + amount);
-    accountRepository.save(account);
+    WalletTransaction tx = recordTransaction(userId, WalletTransactionType.TOPUP, WalletTransactionStatus.PENDING,
+      normalizedCurrency, amount, provider, referenceId, null);
+    log.info("Wallet topup pending: userId={}, amount={}, currency={}, provider={}", userId, amount, normalizedCurrency, provider);
+    return tx;
+  }
 
-    WalletTransaction tx = recordTransaction(userId, WalletTransactionType.TOPUP, WalletTransactionStatus.COMPLETED,
-      normalizedCurrency, amount, "TOPUP", null, null);
-    recordEntry(tx, account, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.CREDIT, amount, "Topup");
+  @Transactional
+  public WalletBalanceDto completePendingTopup(UUID transactionId) {
+    WalletTransaction tx = transactionRepository.findById(transactionId)
+      .orElseThrow(() -> new WalletException(HttpStatus.NOT_FOUND, "Topup transaction not found"));
+    if (tx.getStatus() == WalletTransactionStatus.COMPLETED) {
+      WalletAccount account = getOrCreateAccount(tx.getUserId(), tx.getCurrencyCode());
+      return toBalanceDto(account);
+    }
+    if (tx.getStatus() == WalletTransactionStatus.FAILED) {
+      throw new WalletException(HttpStatus.CONFLICT, "Topup transaction already failed");
+    }
 
-    log.info("Wallet topup: userId={}, amount={}, currency={}", userId, amount, normalizedCurrency);
+    WalletAccount account = getOrCreateAccount(tx.getUserId(), tx.getCurrencyCode());
+    WalletAccount systemAccount = getOrCreateAccount(SYSTEM_USER_ID, tx.getCurrencyCode());
+
+    recordEntry(tx, systemAccount, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.DEBIT, tx.getAmount(), "Topup funding");
+    recordEntry(tx, account, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.CREDIT, tx.getAmount(), "Topup");
+
+    tx.setStatus(WalletTransactionStatus.COMPLETED);
+    transactionRepository.save(tx);
+    log.info("Wallet topup completed: transactionId={}", transactionId);
     return toBalanceDto(account);
   }
 
   @Transactional
-  public WalletBalanceDto withdraw(UUID userId, String currency, Long amount, String destination) {
+  public void failPendingTopup(UUID transactionId, String reason) {
+    WalletTransaction tx = transactionRepository.findById(transactionId)
+      .orElseThrow(() -> new WalletException(HttpStatus.NOT_FOUND, "Topup transaction not found"));
+    if (tx.getStatus() == WalletTransactionStatus.COMPLETED) {
+      throw new WalletException(HttpStatus.CONFLICT, "Topup transaction already completed");
+    }
+    tx.setStatus(WalletTransactionStatus.FAILED);
+    if (StringUtils.hasText(reason)) {
+      tx.setMetadata(reason);
+    }
+    transactionRepository.save(tx);
+    log.info("Wallet topup failed: transactionId={}, reason={}", transactionId, reason);
+  }
+
+  @Transactional
+  public WalletTransaction createPendingWithdraw(UUID userId,
+                                                 String currency,
+                                                 Long amount,
+                                                 String provider,
+                                                 String destination) {
     validateInput(userId, "withdraw", currency, amount);
     String normalizedCurrency = normalizeCurrency(currency);
     WalletAccount account = getOrCreateAccount(userId, normalizedCurrency);
-    if (account.getAvailableAmount() < amount) {
+    long availableBalance = balanceFor(account, WalletEntryBalanceType.AVAILABLE);
+    if (availableBalance < amount) {
       throw new WalletException(HttpStatus.BAD_REQUEST, "Insufficient wallet balance");
     }
-    account.setAvailableAmount(account.getAvailableAmount() - amount);
-    accountRepository.save(account);
+    WalletTransaction tx = recordTransaction(userId, WalletTransactionType.WITHDRAW, WalletTransactionStatus.PENDING,
+      normalizedCurrency, amount, provider, destination, null);
+    log.info("Wallet withdraw pending: userId={}, amount={}, currency={}, provider={}", userId, amount, normalizedCurrency, provider);
+    return tx;
+  }
 
-    WalletTransaction tx = recordTransaction(userId, WalletTransactionType.WITHDRAW, WalletTransactionStatus.COMPLETED,
-      normalizedCurrency, amount, "WITHDRAW", null, destination);
-    recordEntry(tx, account, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.DEBIT, amount, "Withdraw");
+  @Transactional
+  public WalletBalanceDto completePendingWithdraw(UUID transactionId) {
+    WalletTransaction tx = transactionRepository.findById(transactionId)
+      .orElseThrow(() -> new WalletException(HttpStatus.NOT_FOUND, "Withdraw transaction not found"));
+    if (tx.getStatus() == WalletTransactionStatus.COMPLETED) {
+      WalletAccount account = getOrCreateAccount(tx.getUserId(), tx.getCurrencyCode());
+      return toBalanceDto(account);
+    }
+    if (tx.getStatus() == WalletTransactionStatus.FAILED) {
+      throw new WalletException(HttpStatus.CONFLICT, "Withdraw transaction already failed");
+    }
 
-    log.info("Wallet withdraw: userId={}, amount={}, currency={}", userId, amount, normalizedCurrency);
+    WalletAccount account = getOrCreateAccount(tx.getUserId(), tx.getCurrencyCode());
+    long availableBalance = balanceFor(account, WalletEntryBalanceType.AVAILABLE);
+    if (availableBalance < tx.getAmount()) {
+      throw new WalletException(HttpStatus.BAD_REQUEST, "Insufficient wallet balance");
+    }
+    WalletAccount systemAccount = getOrCreateAccount(SYSTEM_USER_ID, tx.getCurrencyCode());
+
+    recordEntry(tx, account, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.DEBIT, tx.getAmount(), "Withdraw");
+    recordEntry(tx, systemAccount, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.CREDIT, tx.getAmount(), "Withdraw");
+
+    tx.setStatus(WalletTransactionStatus.COMPLETED);
+    transactionRepository.save(tx);
+    log.info("Wallet withdraw completed: transactionId={}", transactionId);
     return toBalanceDto(account);
+  }
+
+  @Transactional
+  public void failPendingWithdraw(UUID transactionId, String reason) {
+    WalletTransaction tx = transactionRepository.findById(transactionId)
+      .orElseThrow(() -> new WalletException(HttpStatus.NOT_FOUND, "Withdraw transaction not found"));
+    if (tx.getStatus() == WalletTransactionStatus.COMPLETED) {
+      throw new WalletException(HttpStatus.CONFLICT, "Withdraw transaction already completed");
+    }
+    tx.setStatus(WalletTransactionStatus.FAILED);
+    if (StringUtils.hasText(reason)) {
+      tx.setMetadata(reason);
+    }
+    transactionRepository.save(tx);
+    log.info("Wallet withdraw failed: transactionId={}, reason={}", transactionId, reason);
+  }
+
+  @Transactional
+  public void updateTransactionReference(UUID transactionId, String referenceId) {
+    if (!StringUtils.hasText(referenceId)) {
+      return;
+    }
+    WalletTransaction tx = transactionRepository.findById(transactionId)
+      .orElseThrow(() -> new WalletException(HttpStatus.NOT_FOUND, "Transaction not found"));
+    tx.setReferenceId(referenceId);
+    transactionRepository.save(tx);
+  }
+
+  @Transactional
+  public WalletBalanceDto withdraw(UUID userId, String currency, Long amount, String destination) {
+    WalletTransaction tx = createPendingWithdraw(userId, currency, amount, "MANUAL", destination);
+    return completePendingWithdraw(tx.getId());
   }
 
   @Transactional
@@ -201,14 +299,10 @@ public class WalletPaymentService {
     WalletAccount senderAccount = getOrCreateAccount(userId, normalizedCurrency);
     WalletAccount recipientAccount = getOrCreateAccount(recipientId, normalizedCurrency);
 
-    if (senderAccount.getAvailableAmount() < amount) {
+    long availableBalance = balanceFor(senderAccount, WalletEntryBalanceType.AVAILABLE);
+    if (availableBalance < amount) {
       throw new WalletException(HttpStatus.BAD_REQUEST, "Insufficient wallet balance");
     }
-
-    senderAccount.setAvailableAmount(senderAccount.getAvailableAmount() - amount);
-    recipientAccount.setAvailableAmount(recipientAccount.getAvailableAmount() + amount);
-    accountRepository.save(senderAccount);
-    accountRepository.save(recipientAccount);
 
     WalletTransaction tx = recordTransaction(userId, WalletTransactionType.TRANSFER, WalletTransactionStatus.COMPLETED,
       normalizedCurrency, amount, "TRANSFER", recipientId.toString(), note);
@@ -286,9 +380,8 @@ public class WalletPaymentService {
       WalletAccount created = new WalletAccount();
       created.setUserId(userId);
       created.setCurrencyCode(currency);
-      created.setAvailableAmount(0L);
-      created.setReservedAmount(0L);
-      return accountRepository.save(created);
+      accountRepository.save(created);
+      return accountRepository.findForUpdate(userId, currency).orElse(created);
     }
     return account;
   }
@@ -296,8 +389,8 @@ public class WalletPaymentService {
   private WalletBalanceDto toBalanceDto(WalletAccount account) {
     WalletBalanceDto dto = new WalletBalanceDto();
     dto.setCurrency(account.getCurrencyCode());
-    dto.setAvailable(account.getAvailableAmount());
-    dto.setReserved(account.getReservedAmount());
+    dto.setAvailable(balanceFor(account, WalletEntryBalanceType.AVAILABLE));
+    dto.setReserved(balanceFor(account, WalletEntryBalanceType.RESERVED));
     return dto;
   }
 
@@ -344,6 +437,11 @@ public class WalletPaymentService {
     entry.setCurrencyCode(account.getCurrencyCode());
     entry.setDescription(description);
     entryRepository.save(entry);
+  }
+
+  private long balanceFor(WalletAccount account, WalletEntryBalanceType balanceType) {
+    Long sum = entryRepository.sumForBalanceType(account.getId(), balanceType);
+    return sum == null ? 0L : sum;
   }
 
   private void validateInput(UUID userId, String cartId, String currency, Long amount) {
