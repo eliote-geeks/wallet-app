@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.socialwallet.store.MedusaProperties;
 import com.socialwallet.store.StoreException;
+import com.socialwallet.store.model.StoreWebhookEvent;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -23,17 +24,32 @@ import org.springframework.util.StringUtils;
 public class MedusaWebhookService {
   private final MedusaProperties properties;
   private final ObjectMapper objectMapper;
+  private final StoreWebhookEventService eventService;
 
   public void handle(String payload, Map<String, String> headers) {
     String signature = findHeader(headers, "x-medusa-signature");
-    if (!isSignatureValid(payload, signature)) {
-      throw new StoreException(HttpStatus.UNAUTHORIZED, "Invalid Medusa webhook signature");
-    }
     String event = findHeader(headers, "x-medusa-event");
     if (!StringUtils.hasText(event)) {
       event = extractEvent(payload);
     }
-    log.info("Medusa webhook received event={} payloadSize={}", event, payload == null ? 0 : payload.length());
+    StoreWebhookEvent record = eventService.record("medusa", event, payload, headers, signature);
+    process(record, payload, signature, event);
+  }
+
+  public StoreWebhookEvent retry(StoreWebhookEvent record) {
+    return process(record, record.getPayload(), record.getSignature(), record.getEventName());
+  }
+
+  private StoreWebhookEvent process(StoreWebhookEvent record,
+                                    String payload,
+                                    String signature,
+                                    String event) {
+    return eventService.process(record, () -> {
+      if (!isSignatureValid(payload, signature)) {
+        throw new StoreException(HttpStatus.UNAUTHORIZED, "Invalid Medusa webhook signature");
+      }
+      log.info("Medusa webhook received event={} payloadSize={}", event, payload == null ? 0 : payload.length());
+    });
   }
 
   private boolean isSignatureValid(String payload, String signature) {

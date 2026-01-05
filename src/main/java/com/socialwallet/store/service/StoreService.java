@@ -1,13 +1,16 @@
 package com.socialwallet.store.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.socialwallet.store.StoreException;
 import com.socialwallet.store.model.StoreCustomerMapping;
 import com.socialwallet.store.repository.StoreCustomerMappingRepository;
+import com.socialwallet.wallet.application.WalletPaymentService;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
@@ -17,6 +20,7 @@ import org.springframework.util.StringUtils;
 public class StoreService {
   private final MedusaClient medusaClient;
   private final StoreCustomerMappingRepository mappingRepository;
+  private final WalletPaymentService walletPaymentService;
 
   public JsonNode listProducts(MultiValueMap<String, String> params) {
     return medusaClient.getStore("/store/products", params);
@@ -36,6 +40,23 @@ public class StoreService {
 
   public JsonNode listRegions(MultiValueMap<String, String> params) {
     return medusaClient.getStore("/store/regions", params);
+  }
+
+  public JsonNode listPaymentProviders(MultiValueMap<String, String> params) {
+    if (params == null || !params.containsKey("region_id")) {
+      throw new StoreException(HttpStatus.BAD_REQUEST, "region_id is required");
+    }
+    return medusaClient.getStore("/store/payment-providers", params);
+  }
+
+  public JsonNode createPaymentCollection(String cartId, Map<String, Object> payload) {
+    Map<String, Object> body = payload == null ? new LinkedHashMap<>() : new LinkedHashMap<>(payload);
+    body.putIfAbsent("cart_id", cartId);
+    return medusaClient.postStore("/store/payment-collections", body);
+  }
+
+  public JsonNode createPaymentSession(String collectionId, Map<String, Object> payload) {
+    return medusaClient.postStore("/store/payment-collections/" + collectionId + "/payment-sessions", payload);
   }
 
   public JsonNode createCart(UUID userId, String email, Map<String, Object> payload) {
@@ -66,7 +87,22 @@ public class StoreService {
     return medusaClient.postStore("/store/carts/" + cartId + "/shipping-methods", payload);
   }
 
-  public JsonNode completeCart(String cartId) {
+  public JsonNode completeCart(UUID userId, String cartId, String paymentMethod) {
+    if ("wallet".equalsIgnoreCase(paymentMethod)) {
+      return completeCartWithWallet(userId, cartId);
+    }
+    return medusaClient.postStore("/store/carts/" + cartId + "/complete");
+  }
+
+  public JsonNode completeCartWithWallet(UUID userId, String cartId) {
+    if (userId == null) {
+      throw new StoreException(HttpStatus.UNAUTHORIZED, "Wallet checkout requires authentication");
+    }
+    JsonNode cartResponse = medusaClient.getStore("/store/carts/" + cartId);
+    JsonNode cartNode = cartResponse.path("cart");
+    String currency = cartNode.path("currency_code").asText(null);
+    Long amount = cartNode.path("total").isNumber() ? cartNode.path("total").asLong() : null;
+    walletPaymentService.authorize(userId, cartId, currency, amount);
     return medusaClient.postStore("/store/carts/" + cartId + "/complete");
   }
 

@@ -43,6 +43,11 @@ public class StoreController {
     return ResponseEntity.ok(storeService.listRegions(params));
   }
 
+  @GetMapping("/payment-providers")
+  public ResponseEntity<JsonNode> listPaymentProviders(@RequestParam MultiValueMap<String, String> params) {
+    return ResponseEntity.ok(storeService.listPaymentProviders(params));
+  }
+
   @PostMapping("/carts")
   public ResponseEntity<JsonNode> createCart(Principal principal,
                                              @AuthenticationPrincipal Jwt jwt,
@@ -82,8 +87,24 @@ public class StoreController {
     return ResponseEntity.ok(storeService.addShippingMethod(cartId, payload));
   }
 
+  @PostMapping("/carts/{cartId}/payment-collection")
+  public ResponseEntity<JsonNode> createPaymentCollection(@PathVariable String cartId,
+                                                          @RequestBody(required = false) Map<String, Object> payload) {
+    return ResponseEntity.ok(storeService.createPaymentCollection(cartId, payload));
+  }
+
+  @PostMapping("/payment-collections/{collectionId}/payment-sessions")
+  public ResponseEntity<JsonNode> createPaymentSession(@PathVariable String collectionId,
+                                                       @RequestBody Map<String, Object> payload) {
+    return ResponseEntity.ok(storeService.createPaymentSession(collectionId, payload));
+  }
+
   @PostMapping("/carts/{cartId}/complete")
-  public ResponseEntity<JsonNode> completeCart(@PathVariable String cartId) {
-    return ResponseEntity.ok(storeService.completeCart(cartId));
+  public ResponseEntity<JsonNode> completeCart(Principal principal,
+                                               @PathVariable String cartId,
+                                               @RequestBody(required = false) Map<String, Object> payload) {
+    UUID userId = principal != null ? UUID.fromString(principal.getName()) : null;
+    String paymentMethod = payload != null ? String.valueOf(payload.getOrDefault("payment_method", "")) : "";
+    return ResponseEntity.ok(storeService.completeCart(userId, cartId, paymentMethod));
   }
 }
