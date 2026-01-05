@@ -50,12 +50,21 @@ public class StoreService {
   }
 
   public JsonNode createPaymentCollection(String cartId, Map<String, Object> payload) {
+    if (!StringUtils.hasText(cartId)) {
+      throw new StoreException(HttpStatus.BAD_REQUEST, "cartId is required");
+    }
     Map<String, Object> body = payload == null ? new LinkedHashMap<>() : new LinkedHashMap<>(payload);
     body.putIfAbsent("cart_id", cartId);
     return medusaClient.postStore("/store/payment-collections", body);
   }
 
   public JsonNode createPaymentSession(String collectionId, Map<String, Object> payload) {
+    if (!StringUtils.hasText(collectionId)) {
+      throw new StoreException(HttpStatus.BAD_REQUEST, "collectionId is required");
+    }
+    if (payload == null || !payload.containsKey("provider_id")) {
+      throw new StoreException(HttpStatus.BAD_REQUEST, "provider_id is required");
+    }
     return medusaClient.postStore("/store/payment-collections/" + collectionId + "/payment-sessions", payload);
   }
 
