@@ -124,6 +124,10 @@ Le JWK set est lu sur:
 - Checkout wallet: `POST /api/store/carts/{cartId}/complete` payload: `{ "payment_method": "wallet" }`
 - Le wallet supporte plusieurs devises (un compte par devise) ; la devise doit matcher celle du cart Medusa.
 
+## Admin wallet
+- `GET /api/admin/wallet/ledger/diagnostics` (ADMIN) -> compare ledger vs cache
+- `POST /api/admin/wallet/ledger/recalculate` (ADMIN) -> met a jour les colonnes cachees `available_amount`/`reserved_amount`
+
 ## Mobile Money (placeholder)
 - `POST /api/payments/mobile-money/topups` (JWT requis) payload: `{ "amount": 15000, "currency": "XAF", "phoneNumber": "+237...", "provider": "mtn" }`
 - `POST /api/payments/mobile-money/withdrawals` (JWT requis) payload: `{ "amount": 5000, "currency": "XAF", "phoneNumber": "+237...", "provider": "mtn" }`
