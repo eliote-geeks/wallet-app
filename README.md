@@ -118,6 +118,11 @@ Le JWK set est lu sur:
 - Inscription/login par numero de telephone (format E.164 recommande, ex: `+237...`).
 - Email optionnel.
 
+## LiveKit (appels audio/video)
+- Lancer LiveKit: `docker compose -f infra/livekit/docker-compose.yml up -d`
+- Endpoint token: `POST /api/calls/token` (JWT requis) payload: `{ "roomName": "call-123", "audioOnly": true }`
+- Response: `{ "roomName", "identity", "token", "livekitUrl" }`
+
 ## Wallet (dev)
 - `GET /api/wallet/balance` (JWT requis) -> liste des soldes par devise
 - `GET /api/wallet/balance/{currency}` (JWT requis)

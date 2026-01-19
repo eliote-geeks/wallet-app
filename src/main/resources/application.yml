@@ -65,6 +65,13 @@ app:
     password-salt: ${OPENIM_PASSWORD_SALT:change_me}
     device-id: ${OPENIM_DEVICE_ID:backend}
     repair-on-startup: ${OPENIM_REPAIR_ON_STARTUP:false}
+  calls:
+    livekit:
+      enabled: ${LIVEKIT_ENABLED:true}
+      url: ${LIVEKIT_URL:ws://localhost:7880}
+      api-key: ${LIVEKIT_API_KEY:devkey}
+      api-secret: ${LIVEKIT_API_SECRET:devsecretdevsecretdevsecretdevsec}
+      token-ttl-seconds: ${LIVEKIT_TOKEN_TTL_SECONDS:3600}
   store:
     medusa:
       base-url: ${MEDUSA_BASE_URL:http://localhost:9000}
