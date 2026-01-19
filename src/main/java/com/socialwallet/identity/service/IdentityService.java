@@ -31,20 +31,20 @@ public class IdentityService {
     String email = normalize(request.getEmail());
     String phone = normalize(request.getPhoneNumber());
 
-    if ((email == null || email.isBlank()) && (phone == null || phone.isBlank())) {
-      throw new IdentityException(HttpStatus.BAD_REQUEST, "Email or phone is required");
+    if (phone == null || phone.isBlank()) {
+      throw new IdentityException(HttpStatus.BAD_REQUEST, "Phone number is required");
     }
 
     if (email != null && keycloakAdminClient.userExistsByEmail(email)) {
       throw new IdentityException(HttpStatus.CONFLICT, "Email already registered");
     }
 
-    if (phone != null && keycloakAdminClient.userExistsByUsername(phone)) {
+    if (keycloakAdminClient.userExistsByUsername(phone)) {
       throw new IdentityException(HttpStatus.CONFLICT, "Phone already registered");
     }
 
-    OtpChannel channel = phone != null && !phone.isBlank() ? OtpChannel.PHONE : OtpChannel.EMAIL;
-    String target = channel == OtpChannel.PHONE ? phone : email;
+    OtpChannel channel = OtpChannel.PHONE;
+    String target = phone;
 
     OtpService.OtpResult result = otpService.createOtp(target, channel, OtpPurpose.REGISTER);
 
@@ -91,6 +91,9 @@ public class IdentityService {
     String identifier = normalize(request.getIdentifier());
     if (identifier == null) {
       throw new IdentityException(HttpStatus.BAD_REQUEST, "Identifier is required");
+    }
+    if (identifier.contains("@")) {
+      throw new IdentityException(HttpStatus.BAD_REQUEST, "Use phone number to login");
     }
 
     String username = resolveUsername(identifier).orElse(identifier);

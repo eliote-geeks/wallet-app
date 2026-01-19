@@ -114,6 +114,10 @@ Le JWK set est lu sur:
 - Public: `GET /api/public/ping`
 - Prive: `GET /api/private/me` (necessite JWT)
 
+## Auth (dev)
+- Inscription/login par numero de telephone (format E.164 recommande, ex: `+237...`).
+- Email optionnel.
+
 ## Wallet (dev)
 - `GET /api/wallet/balance` (JWT requis) -> liste des soldes par devise
 - `GET /api/wallet/balance/{currency}` (JWT requis)
