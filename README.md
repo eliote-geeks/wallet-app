@@ -122,6 +122,9 @@ Le JWK set est lu sur:
 - Lancer LiveKit: `docker compose -f infra/livekit/docker-compose.yml up -d`
 - Endpoint token: `POST /api/calls/token` (JWT requis) payload: `{ "roomName": "call-123", "audioOnly": true }`
 - Response: `{ "roomName", "identity", "token", "livekitUrl" }`
+- Signalisation OpenIM:
+  - `POST /api/calls/invite` -> payload OpenIM a envoyer au destinataire
+  - `POST /api/calls/respond` -> payload OpenIM a renvoyer au caller (accept/decline/busy/cancel/end)
 
 ## Wallet (dev)
 - `GET /api/wallet/balance` (JWT requis) -> liste des soldes par devise
