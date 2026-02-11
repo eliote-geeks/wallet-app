@@ -1,5 +1,7 @@
 package com.socialwallet.admin.service;
 
+import com.socialwallet.admin.model.RoleAuditLog;
+import com.socialwallet.admin.repository.RoleAuditLogRepository;
 import com.socialwallet.identity.IdentityException;
 import com.socialwallet.identity.repository.UserAccountRepository;
 import com.socialwallet.identity.service.KeycloakAdminClient;
@@ -18,19 +20,24 @@ public class RoleAdminService {
   private static final String ROLE_SELLER = "SELLER";
   private static final String ROLE_MODERATOR = "MODERATOR";
   private static final String ROLE_ADMIN = "ADMIN";
+  private static final String ACTION_ASSIGN = "ASSIGN";
+  private static final String ACTION_REVOKE = "REVOKE";
 
   private final UserAccountRepository userAccountRepository;
   private final KeycloakAdminClient keycloakAdminClient;
+  private final RoleAuditLogRepository roleAuditLogRepository;
 
   public Set<String> getRoles(UUID userId) {
     assertUserExists(userId);
     return keycloakAdminClient.getUserRealmRoles(userId);
   }
 
-  public Set<String> assignRole(UUID userId, String roleName) {
+  public Set<String> assignRole(UUID actorUserId, UUID userId, String roleName) {
     assertUserExists(userId);
     String normalized = normalizeRole(roleName);
-    return keycloakAdminClient.assignRealmRoles(userId, List.of(normalized));
+    Set<String> roles = keycloakAdminClient.assignRealmRoles(userId, List.of(normalized));
+    audit(actorUserId, userId, normalized, ACTION_ASSIGN);
+    return roles;
   }
 
   public Set<String> revokeRole(UUID actorUserId, UUID targetUserId, String roleName) {
@@ -42,27 +49,37 @@ public class RoleAdminService {
     if (ROLE_ADMIN.equals(normalized) && actorUserId != null && actorUserId.equals(targetUserId)) {
       throw new IdentityException(HttpStatus.BAD_REQUEST, "You cannot revoke your own ADMIN role");
     }
-    return keycloakAdminClient.removeRealmRoles(targetUserId, List.of(normalized));
+    Set<String> roles = keycloakAdminClient.removeRealmRoles(targetUserId, List.of(normalized));
+    audit(actorUserId, targetUserId, normalized, ACTION_REVOKE);
+    return roles;
   }
 
-  public Set<String> assignSeller(UUID userId) {
+  public Set<String> assignSeller(UUID actorUserId, UUID userId) {
     assertUserExists(userId);
-    return keycloakAdminClient.assignRealmRoles(userId, List.of(ROLE_USER, ROLE_SELLER));
+    Set<String> roles = keycloakAdminClient.assignRealmRoles(userId, List.of(ROLE_USER, ROLE_SELLER));
+    audit(actorUserId, userId, ROLE_SELLER, ACTION_ASSIGN);
+    return roles;
   }
 
-  public Set<String> revokeSeller(UUID userId) {
+  public Set<String> revokeSeller(UUID actorUserId, UUID userId) {
     assertUserExists(userId);
-    return keycloakAdminClient.removeRealmRoles(userId, List.of(ROLE_SELLER));
+    Set<String> roles = keycloakAdminClient.removeRealmRoles(userId, List.of(ROLE_SELLER));
+    audit(actorUserId, userId, ROLE_SELLER, ACTION_REVOKE);
+    return roles;
   }
 
-  public Set<String> assignModerator(UUID userId) {
+  public Set<String> assignModerator(UUID actorUserId, UUID userId) {
     assertUserExists(userId);
-    return keycloakAdminClient.assignRealmRoles(userId, List.of(ROLE_USER, ROLE_MODERATOR));
+    Set<String> roles = keycloakAdminClient.assignRealmRoles(userId, List.of(ROLE_USER, ROLE_MODERATOR));
+    audit(actorUserId, userId, ROLE_MODERATOR, ACTION_ASSIGN);
+    return roles;
   }
 
-  public Set<String> revokeModerator(UUID userId) {
+  public Set<String> revokeModerator(UUID actorUserId, UUID userId) {
     assertUserExists(userId);
-    return keycloakAdminClient.removeRealmRoles(userId, List.of(ROLE_MODERATOR));
+    Set<String> roles = keycloakAdminClient.removeRealmRoles(userId, List.of(ROLE_MODERATOR));
+    audit(actorUserId, userId, ROLE_MODERATOR, ACTION_REVOKE);
+    return roles;
   }
 
   private void assertUserExists(UUID userId) {
@@ -76,5 +93,14 @@ public class RoleAdminService {
       throw new IdentityException(HttpStatus.BAD_REQUEST, "Role is required");
     }
     return roleName.trim().toUpperCase(Locale.ROOT);
+  }
+
+  private void audit(UUID actorUserId, UUID targetUserId, String roleName, String action) {
+    RoleAuditLog auditLog = new RoleAuditLog();
+    auditLog.setActorUserId(actorUserId);
+    auditLog.setTargetUserId(targetUserId);
+    auditLog.setRoleName(roleName);
+    auditLog.setAction(action);
+    roleAuditLogRepository.save(auditLog);
   }
 }

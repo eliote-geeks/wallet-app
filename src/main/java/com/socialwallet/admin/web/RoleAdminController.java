@@ -35,8 +35,10 @@ public class RoleAdminController {
 
   @PostMapping("/users/{userId}/assign")
   public ResponseEntity<UserRolesResponse> assignRole(@PathVariable UUID userId,
+                                                      @AuthenticationPrincipal Jwt jwt,
                                                       @Valid @RequestBody RoleChangeRequest request) {
-    return ResponseEntity.ok(toResponse(userId, roleAdminService.assignRole(userId, request.getRole())));
+    UUID actorUserId = jwt != null ? UUID.fromString(jwt.getSubject()) : null;
+    return ResponseEntity.ok(toResponse(userId, roleAdminService.assignRole(actorUserId, userId, request.getRole())));
   }
 
   @PostMapping("/users/{userId}/revoke")
@@ -48,23 +50,31 @@ public class RoleAdminController {
   }
 
   @PostMapping("/users/{userId}/seller")
-  public ResponseEntity<UserRolesResponse> assignSeller(@PathVariable UUID userId) {
-    return ResponseEntity.ok(toResponse(userId, roleAdminService.assignSeller(userId)));
+  public ResponseEntity<UserRolesResponse> assignSeller(@PathVariable UUID userId,
+                                                        @AuthenticationPrincipal Jwt jwt) {
+    UUID actorUserId = jwt != null ? UUID.fromString(jwt.getSubject()) : null;
+    return ResponseEntity.ok(toResponse(userId, roleAdminService.assignSeller(actorUserId, userId)));
   }
 
   @DeleteMapping("/users/{userId}/seller")
-  public ResponseEntity<UserRolesResponse> revokeSeller(@PathVariable UUID userId) {
-    return ResponseEntity.ok(toResponse(userId, roleAdminService.revokeSeller(userId)));
+  public ResponseEntity<UserRolesResponse> revokeSeller(@PathVariable UUID userId,
+                                                        @AuthenticationPrincipal Jwt jwt) {
+    UUID actorUserId = jwt != null ? UUID.fromString(jwt.getSubject()) : null;
+    return ResponseEntity.ok(toResponse(userId, roleAdminService.revokeSeller(actorUserId, userId)));
   }
 
   @PostMapping("/users/{userId}/moderator")
-  public ResponseEntity<UserRolesResponse> assignModerator(@PathVariable UUID userId) {
-    return ResponseEntity.ok(toResponse(userId, roleAdminService.assignModerator(userId)));
+  public ResponseEntity<UserRolesResponse> assignModerator(@PathVariable UUID userId,
+                                                           @AuthenticationPrincipal Jwt jwt) {
+    UUID actorUserId = jwt != null ? UUID.fromString(jwt.getSubject()) : null;
+    return ResponseEntity.ok(toResponse(userId, roleAdminService.assignModerator(actorUserId, userId)));
   }
 
   @DeleteMapping("/users/{userId}/moderator")
-  public ResponseEntity<UserRolesResponse> revokeModerator(@PathVariable UUID userId) {
-    return ResponseEntity.ok(toResponse(userId, roleAdminService.revokeModerator(userId)));
+  public ResponseEntity<UserRolesResponse> revokeModerator(@PathVariable UUID userId,
+                                                           @AuthenticationPrincipal Jwt jwt) {
+    UUID actorUserId = jwt != null ? UUID.fromString(jwt.getSubject()) : null;
+    return ResponseEntity.ok(toResponse(userId, roleAdminService.revokeModerator(actorUserId, userId)));
   }
 
   private UserRolesResponse toResponse(UUID userId, Set<String> roles) {

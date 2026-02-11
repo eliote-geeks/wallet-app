@@ -135,6 +135,7 @@ Le JWK set est lu sur:
 - `POST /api/admin/roles/users/{userId}/assign` payload `{ "role": "ADMIN" }` -> attribution generique
 - `POST /api/admin/roles/users/{userId}/revoke` payload `{ "role": "ADMIN" }` -> retrait generique
 - Garde-fou: impossible de retirer `USER`; impossible de retirer son propre role `ADMIN`.
+- Audit DB des changements de roles: table `role_audit_log` (`who`, `when`, `target`, `role`, `action`).
 
 ## LiveKit (appels audio/video)
 - Lancer LiveKit: `docker compose -f infra/livekit/docker-compose.yml up -d`
@@ -158,7 +159,11 @@ Le JWK set est lu sur:
 ## Store vendeur (dev)
 - Endpoints proteges `SELLER_OR_ADMIN`:
 - `POST /api/store/seller/products` -> creation produit via Medusa admin API (metadata `kobo_seller_id` auto-injectee)
+- `GET /api/store/seller/products` -> liste des produits vendeur (filtre ownership strict pour SELLER)
 - `POST /api/store/seller/products/{productId}` -> mise a jour produit (bloquee si vendeur different pour un utilisateur non-admin)
+- `PATCH /api/store/seller/products/{productId}/pricing-stock` -> mise a jour prix/stock (payload `variants`)
+- `POST /api/store/seller/products/{productId}/archive` -> archivage produit (status `draft` + metadata archive)
+- Ownership strict: un SELLER ne peut lire/modifier/archiver que ses propres produits.
 - Prerequis: `MEDUSA_ADMIN_TOKEN` configure.
 
 ## Admin wallet

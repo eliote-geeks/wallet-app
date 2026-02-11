@@ -124,6 +124,15 @@ public class StoreController {
     return ResponseEntity.ok(storeService.createSellerProduct(sellerId, body));
   }
 
+  @GetMapping("/seller/products")
+  @PreAuthorize(SELLER_OR_ADMIN)
+  public ResponseEntity<JsonNode> listSellerProducts(@AuthenticationPrincipal Jwt jwt,
+                                                     @RequestParam MultiValueMap<String, String> params) {
+    UUID sellerId = UUID.fromString(jwt.getSubject());
+    boolean admin = hasRole(jwt, "ADMIN");
+    return ResponseEntity.ok(storeService.listSellerProducts(sellerId, admin, params));
+  }
+
   @PostMapping("/seller/products/{productId}")
   @PreAuthorize(SELLER_OR_ADMIN)
   public ResponseEntity<JsonNode> updateSellerProduct(@AuthenticationPrincipal Jwt jwt,
@@ -133,6 +142,25 @@ public class StoreController {
     boolean admin = hasRole(jwt, "ADMIN");
     Map<String, Object> body = payload == null ? new LinkedHashMap<>() : payload;
     return ResponseEntity.ok(storeService.updateSellerProduct(sellerId, productId, admin, body));
+  }
+
+  @PatchMapping("/seller/products/{productId}/pricing-stock")
+  @PreAuthorize(SELLER_OR_ADMIN)
+  public ResponseEntity<JsonNode> updateSellerProductPricingStock(@AuthenticationPrincipal Jwt jwt,
+                                                                  @PathVariable String productId,
+                                                                  @RequestBody Map<String, Object> payload) {
+    UUID sellerId = UUID.fromString(jwt.getSubject());
+    boolean admin = hasRole(jwt, "ADMIN");
+    return ResponseEntity.ok(storeService.updateSellerProductPricingAndStock(sellerId, productId, admin, payload));
+  }
+
+  @PostMapping("/seller/products/{productId}/archive")
+  @PreAuthorize(SELLER_OR_ADMIN)
+  public ResponseEntity<JsonNode> archiveSellerProduct(@AuthenticationPrincipal Jwt jwt,
+                                                       @PathVariable String productId) {
+    UUID sellerId = UUID.fromString(jwt.getSubject());
+    boolean admin = hasRole(jwt, "ADMIN");
+    return ResponseEntity.ok(storeService.archiveSellerProduct(sellerId, productId, admin));
   }
 
   private boolean hasRole(Jwt jwt, String expectedRole) {
