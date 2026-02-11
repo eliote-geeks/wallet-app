@@ -128,6 +128,7 @@ Le JWK set est lu sur:
 
 ### Workflow attribution SELLER/MODERATOR (admin)
 - `GET /api/admin/roles/users/{userId}` -> roles Keycloak de l utilisateur
+- `GET /api/admin/roles/audit` -> historique des changements de roles (filtres: `actorUserId`, `targetUserId`, `role`, `action`, pagination)
 - `POST /api/admin/roles/users/{userId}/seller` -> attribue `SELLER` (+ garantit `USER`)
 - `DELETE /api/admin/roles/users/{userId}/seller` -> retire `SELLER`
 - `POST /api/admin/roles/users/{userId}/moderator` -> attribue `MODERATOR` (+ garantit `USER`)

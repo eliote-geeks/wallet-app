@@ -2,10 +2,15 @@ package com.socialwallet.admin.web;
 
 import static com.socialwallet.config.RbacExpressions.ADMIN;
 
+import com.socialwallet.admin.dto.RoleAuditLogDto;
 import com.socialwallet.admin.dto.RoleChangeRequest;
 import com.socialwallet.admin.dto.UserRolesResponse;
+import com.socialwallet.admin.model.RoleAuditLog;
 import com.socialwallet.admin.service.RoleAdminService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +24,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -31,6 +37,20 @@ public class RoleAdminController {
   @GetMapping("/users/{userId}")
   public ResponseEntity<UserRolesResponse> getUserRoles(@PathVariable UUID userId) {
     return ResponseEntity.ok(toResponse(userId, roleAdminService.getRoles(userId)));
+  }
+
+  @GetMapping("/audit")
+  public ResponseEntity<Page<RoleAuditLogDto>> listAudit(
+    @RequestParam(name = "actorUserId", required = false) UUID actorUserId,
+    @RequestParam(name = "targetUserId", required = false) UUID targetUserId,
+    @RequestParam(name = "role", required = false) String role,
+    @RequestParam(name = "action", required = false) String action,
+    @PageableDefault(size = 50, sort = "createdAt", direction = org.springframework.data.domain.Sort.Direction.DESC)
+    Pageable pageable) {
+    Page<RoleAuditLogDto> page = roleAdminService
+      .listAudit(actorUserId, targetUserId, role, action, pageable)
+      .map(this::toAuditResponse);
+    return ResponseEntity.ok(page);
   }
 
   @PostMapping("/users/{userId}/assign")
@@ -82,5 +102,16 @@ public class RoleAdminController {
     response.setUserId(userId);
     response.setRoles(roles);
     return response;
+  }
+
+  private RoleAuditLogDto toAuditResponse(RoleAuditLog entry) {
+    RoleAuditLogDto dto = new RoleAuditLogDto();
+    dto.setId(entry.getId());
+    dto.setActorUserId(entry.getActorUserId());
+    dto.setTargetUserId(entry.getTargetUserId());
+    dto.setRoleName(entry.getRoleName());
+    dto.setAction(entry.getAction());
+    dto.setCreatedAt(entry.getCreatedAt());
+    return dto;
   }
 }

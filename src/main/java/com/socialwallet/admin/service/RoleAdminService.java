@@ -10,6 +10,11 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -102,5 +107,50 @@ public class RoleAdminService {
     auditLog.setRoleName(roleName);
     auditLog.setAction(action);
     roleAuditLogRepository.save(auditLog);
+  }
+
+  public Page<RoleAuditLog> listAudit(UUID actorUserId,
+                                      UUID targetUserId,
+                                      String roleName,
+                                      String action,
+                                      Pageable pageable) {
+    Specification<RoleAuditLog> spec = Specification.where(null);
+
+    if (actorUserId != null) {
+      spec = spec.and((root, query, cb) -> cb.equal(root.get("actorUserId"), actorUserId));
+    }
+    if (targetUserId != null) {
+      spec = spec.and((root, query, cb) -> cb.equal(root.get("targetUserId"), targetUserId));
+    }
+
+    String normalizedRole = normalizeFilter(roleName);
+    if (normalizedRole != null) {
+      spec = spec.and((root, query, cb) -> cb.equal(root.get("roleName"), normalizedRole));
+    }
+
+    String normalizedAction = normalizeFilter(action);
+    if (normalizedAction != null) {
+      spec = spec.and((root, query, cb) -> cb.equal(root.get("action"), normalizedAction));
+    }
+
+    Pageable effectivePageable = pageable;
+    if (effectivePageable == null) {
+      effectivePageable = PageRequest.of(0, 50, Sort.by(Sort.Direction.DESC, "createdAt"));
+    } else if (effectivePageable.getSort().isUnsorted()) {
+      effectivePageable = PageRequest.of(
+        effectivePageable.getPageNumber(),
+        effectivePageable.getPageSize(),
+        Sort.by(Sort.Direction.DESC, "createdAt")
+      );
+    }
+
+    return roleAuditLogRepository.findAll(spec, effectivePageable);
+  }
+
+  private String normalizeFilter(String value) {
+    if (value == null || value.trim().isEmpty()) {
+      return null;
+    }
+    return value.trim().toUpperCase(Locale.ROOT);
   }
 }

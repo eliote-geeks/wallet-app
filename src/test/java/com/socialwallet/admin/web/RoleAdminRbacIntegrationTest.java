@@ -1,7 +1,9 @@
 package com.socialwallet.admin.web;
 
+import com.socialwallet.admin.model.RoleAuditLog;
 import com.socialwallet.admin.service.RoleAdminService;
 import com.socialwallet.config.SecurityConfig;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -16,11 +18,14 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.data.domain.PageImpl;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -66,6 +71,38 @@ class RoleAdminRbacIntegrationTest {
       .andExpect(jsonPath("$.roles").isArray());
 
     verify(roleAdminService).assignRole(ADMIN_USER_ID, TARGET_USER_ID, "SELLER");
+  }
+
+  @Test
+  void listAudit_forbidden_forPlainUser() throws Exception {
+    mockMvc.perform(get("/api/admin/roles/audit")
+        .with(userJwt()))
+      .andExpect(status().isForbidden());
+
+    verify(roleAdminService, never()).listAudit(isNull(), isNull(), isNull(), isNull(), org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void listAudit_allowed_forAdmin() throws Exception {
+    RoleAuditLog row = new RoleAuditLog();
+    row.setId(UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd"));
+    row.setActorUserId(ADMIN_USER_ID);
+    row.setTargetUserId(TARGET_USER_ID);
+    row.setRoleName("SELLER");
+    row.setAction("ASSIGN");
+    row.setCreatedAt(Instant.parse("2026-02-11T15:00:00Z"));
+
+    when(roleAdminService.listAudit(isNull(), isNull(), isNull(), isNull(), org.mockito.ArgumentMatchers.any()))
+      .thenReturn(new PageImpl<>(List.of(row)));
+
+    mockMvc.perform(get("/api/admin/roles/audit")
+        .with(adminJwt()))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.content[0].roleName").value("SELLER"))
+      .andExpect(jsonPath("$.content[0].action").value("ASSIGN"))
+      .andExpect(jsonPath("$.content[0].targetUserId").value(TARGET_USER_ID.toString()));
+
+    verify(roleAdminService).listAudit(isNull(), isNull(), isNull(), isNull(), org.mockito.ArgumentMatchers.any());
   }
 
   private JwtRequestPostProcessor adminJwt() {
