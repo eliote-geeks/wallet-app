@@ -2,6 +2,9 @@ package com.socialwallet.store.web;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.socialwallet.store.service.StoreService;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.security.Principal;
 import java.util.Map;
 import java.util.UUID;
@@ -13,6 +16,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import static com.socialwallet.config.RbacExpressions.PLATFORM_USER;
+import static com.socialwallet.config.RbacExpressions.SELLER_OR_ADMIN;
 
 @RestController
 @RequestMapping("/api/store")
@@ -109,5 +113,45 @@ public class StoreController {
     UUID userId = principal != null ? UUID.fromString(principal.getName()) : null;
     String paymentMethod = payload != null ? String.valueOf(payload.getOrDefault("payment_method", "")) : "";
     return ResponseEntity.ok(storeService.completeCart(userId, cartId, paymentMethod));
+  }
+
+  @PostMapping("/seller/products")
+  @PreAuthorize(SELLER_OR_ADMIN)
+  public ResponseEntity<JsonNode> createSellerProduct(@AuthenticationPrincipal Jwt jwt,
+                                                      @RequestBody(required = false) Map<String, Object> payload) {
+    UUID sellerId = UUID.fromString(jwt.getSubject());
+    Map<String, Object> body = payload == null ? new LinkedHashMap<>() : payload;
+    return ResponseEntity.ok(storeService.createSellerProduct(sellerId, body));
+  }
+
+  @PostMapping("/seller/products/{productId}")
+  @PreAuthorize(SELLER_OR_ADMIN)
+  public ResponseEntity<JsonNode> updateSellerProduct(@AuthenticationPrincipal Jwt jwt,
+                                                      @PathVariable String productId,
+                                                      @RequestBody(required = false) Map<String, Object> payload) {
+    UUID sellerId = UUID.fromString(jwt.getSubject());
+    boolean admin = hasRole(jwt, "ADMIN");
+    Map<String, Object> body = payload == null ? new LinkedHashMap<>() : payload;
+    return ResponseEntity.ok(storeService.updateSellerProduct(sellerId, productId, admin, body));
+  }
+
+  private boolean hasRole(Jwt jwt, String expectedRole) {
+    if (jwt == null || expectedRole == null || expectedRole.isBlank()) {
+      return false;
+    }
+    Map<String, Object> realmAccess = jwt.getClaim("realm_access");
+    if (realmAccess == null || realmAccess.isEmpty()) {
+      return false;
+    }
+    Object rolesObject = realmAccess.getOrDefault("roles", Collections.emptyList());
+    if (!(rolesObject instanceof Collection<?> roles)) {
+      return false;
+    }
+    for (Object role : roles) {
+      if (role != null && expectedRole.equalsIgnoreCase(role.toString())) {
+        return true;
+      }
+    }
+    return false;
   }
 }

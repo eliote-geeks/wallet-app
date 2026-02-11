@@ -126,6 +126,16 @@ Le JWK set est lu sur:
 - Endpoints metier proteges (`/api/profiles/**`, `/api/stories/**`, `/api/messaging/**`, `/api/calls/**`, `/api/wallet/**`, `/api/payments/mobile-money/**`, `/api/store/**`, `/api/private/**`, `/api/auth/me`) -> un role parmi `USER|SELLER|MODERATOR|ADMIN`.
 - Endpoints publics: `/api/public/**`, `/api/webhooks/**`, endpoints d auth publics (`/api/auth/register`, `/api/auth/verify-otp`, `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout`).
 
+### Workflow attribution SELLER/MODERATOR (admin)
+- `GET /api/admin/roles/users/{userId}` -> roles Keycloak de l utilisateur
+- `POST /api/admin/roles/users/{userId}/seller` -> attribue `SELLER` (+ garantit `USER`)
+- `DELETE /api/admin/roles/users/{userId}/seller` -> retire `SELLER`
+- `POST /api/admin/roles/users/{userId}/moderator` -> attribue `MODERATOR` (+ garantit `USER`)
+- `DELETE /api/admin/roles/users/{userId}/moderator` -> retire `MODERATOR`
+- `POST /api/admin/roles/users/{userId}/assign` payload `{ "role": "ADMIN" }` -> attribution generique
+- `POST /api/admin/roles/users/{userId}/revoke` payload `{ "role": "ADMIN" }` -> retrait generique
+- Garde-fou: impossible de retirer `USER`; impossible de retirer son propre role `ADMIN`.
+
 ## LiveKit (appels audio/video)
 - Lancer LiveKit: `docker compose -f infra/livekit/docker-compose.yml up -d`
 - Endpoint token: `POST /api/calls/token` (JWT requis) payload: `{ "roomName": "call-123", "audioOnly": true }`
@@ -144,6 +154,12 @@ Le JWK set est lu sur:
 - `GET /api/wallet/transactions` (JWT requis)
 - Checkout wallet: `POST /api/store/carts/{cartId}/complete` payload: `{ "payment_method": "wallet" }`
 - Le wallet supporte plusieurs devises (un compte par devise) ; la devise doit matcher celle du cart Medusa.
+
+## Store vendeur (dev)
+- Endpoints proteges `SELLER_OR_ADMIN`:
+- `POST /api/store/seller/products` -> creation produit via Medusa admin API (metadata `kobo_seller_id` auto-injectee)
+- `POST /api/store/seller/products/{productId}` -> mise a jour produit (bloquee si vendeur different pour un utilisateur non-admin)
+- Prerequis: `MEDUSA_ADMIN_TOKEN` configure.
 
 ## Admin wallet
 - `GET /api/admin/wallet/ledger/diagnostics` (ADMIN) -> compare ledger vs cache

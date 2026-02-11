@@ -5,9 +5,13 @@ import com.socialwallet.identity.IdentityProperties;
 import com.socialwallet.identity.dto.TokenResponse;
 import java.net.URI;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
@@ -82,6 +86,73 @@ public class KeycloakAdminClient {
     resetPassword(userId, password);
     assignDefaultRole(userId);
     return UUID.fromString(userId);
+  }
+
+  public Set<String> getUserRealmRoles(UUID userId) {
+    try {
+      ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
+        adminBaseUrl() + "/users/" + userId + "/role-mappings/realm",
+        HttpMethod.GET,
+        new HttpEntity<>(adminHeaders()),
+        new ParameterizedTypeReference<List<Map<String, Object>>>() {}
+      );
+      return extractRoleNames(response.getBody());
+    } catch (HttpStatusCodeException ex) {
+      if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
+        throw new IdentityException(HttpStatus.NOT_FOUND, "User not found in Keycloak");
+      }
+      throw new IdentityException(HttpStatus.BAD_GATEWAY, "Keycloak user roles lookup failed");
+    }
+  }
+
+  public Set<String> assignRealmRoles(UUID userId, Collection<String> roleNames) {
+    List<Map<String, Object>> resolvedRoles = resolveRoles(roleNames, true);
+    if (resolvedRoles.isEmpty()) {
+      return getUserRealmRoles(userId);
+    }
+
+    HttpHeaders headers = adminHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+
+    try {
+      restTemplate.exchange(
+        adminBaseUrl() + "/users/" + userId + "/role-mappings/realm",
+        HttpMethod.POST,
+        new HttpEntity<>(resolvedRoles, headers),
+        Void.class
+      );
+      return getUserRealmRoles(userId);
+    } catch (HttpStatusCodeException ex) {
+      if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
+        throw new IdentityException(HttpStatus.NOT_FOUND, "User not found in Keycloak");
+      }
+      throw new IdentityException(HttpStatus.BAD_GATEWAY, "Keycloak role assignment failed");
+    }
+  }
+
+  public Set<String> removeRealmRoles(UUID userId, Collection<String> roleNames) {
+    List<Map<String, Object>> resolvedRoles = resolveRoles(roleNames, false);
+    if (resolvedRoles.isEmpty()) {
+      return getUserRealmRoles(userId);
+    }
+
+    HttpHeaders headers = adminHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+
+    try {
+      restTemplate.exchange(
+        adminBaseUrl() + "/users/" + userId + "/role-mappings/realm",
+        HttpMethod.DELETE,
+        new HttpEntity<>(resolvedRoles, headers),
+        Void.class
+      );
+      return getUserRealmRoles(userId);
+    } catch (HttpStatusCodeException ex) {
+      if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
+        throw new IdentityException(HttpStatus.NOT_FOUND, "User not found in Keycloak");
+      }
+      throw new IdentityException(HttpStatus.BAD_GATEWAY, "Keycloak role removal failed");
+    }
   }
 
   private String createUserInternal(String username, String email, String phoneNumber) {
@@ -256,5 +327,60 @@ public class KeycloakAdminClient {
     boolean isValid() {
       return expiresAt != null && expiresAt.isAfter(Instant.now());
     }
+  }
+
+  private List<Map<String, Object>> resolveRoles(Collection<String> roleNames, boolean createIfMissing) {
+    Set<String> normalizedRoleNames = normalizeRoleNames(roleNames);
+    List<Map<String, Object>> roles = new java.util.ArrayList<>();
+    for (String roleName : normalizedRoleNames) {
+      Map<String, Object> role = getRole(roleName);
+      if (role == null && createIfMissing) {
+        createRole(roleName);
+        role = getRole(roleName);
+      }
+      if (role != null) {
+        roles.add(role);
+      }
+    }
+    return roles;
+  }
+
+  private Set<String> normalizeRoleNames(Collection<String> roleNames) {
+    Set<String> normalized = new LinkedHashSet<>();
+    if (roleNames == null) {
+      return normalized;
+    }
+    for (String roleName : roleNames) {
+      if (roleName == null) {
+        continue;
+      }
+      String trimmed = roleName.trim();
+      if (trimmed.isEmpty()) {
+        continue;
+      }
+      normalized.add(trimmed.toUpperCase(Locale.ROOT));
+    }
+    return normalized;
+  }
+
+  private Set<String> extractRoleNames(List<Map<String, Object>> roles) {
+    Set<String> names = new LinkedHashSet<>();
+    if (roles == null) {
+      return names;
+    }
+    for (Map<String, Object> role : roles) {
+      if (role == null) {
+        continue;
+      }
+      Object name = role.get("name");
+      if (name == null) {
+        continue;
+      }
+      String roleName = name.toString().trim();
+      if (!roleName.isEmpty()) {
+        names.add(roleName.toUpperCase(Locale.ROOT));
+      }
+    }
+    return names;
   }
 }

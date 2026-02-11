@@ -140,6 +140,38 @@ public class StoreService {
     return response;
   }
 
+  public JsonNode createSellerProduct(UUID sellerId, Map<String, Object> payload) {
+    if (sellerId == null) {
+      throw new StoreException(HttpStatus.UNAUTHORIZED, "Authentication required");
+    }
+    Map<String, Object> body = payload == null ? new LinkedHashMap<>() : new LinkedHashMap<>(payload);
+    Map<String, Object> target = resolveProductPayload(body);
+    Map<String, Object> metadata = extractMetadata(target);
+    metadata.put("kobo_seller_id", sellerId.toString());
+    target.put("metadata", metadata);
+    return medusaClient.postAdmin("/admin/products", body);
+  }
+
+  public JsonNode updateSellerProduct(UUID sellerId, String productId, boolean admin, Map<String, Object> payload) {
+    if (sellerId == null) {
+      throw new StoreException(HttpStatus.UNAUTHORIZED, "Authentication required");
+    }
+    if (!StringUtils.hasText(productId)) {
+      throw new StoreException(HttpStatus.BAD_REQUEST, "productId is required");
+    }
+
+    if (!admin) {
+      assertSellerOwnsProduct(sellerId, productId);
+    }
+
+    Map<String, Object> body = payload == null ? new LinkedHashMap<>() : new LinkedHashMap<>(payload);
+    Map<String, Object> target = resolveProductPayload(body);
+    Map<String, Object> metadata = extractMetadata(target);
+    metadata.putIfAbsent("kobo_seller_id", sellerId.toString());
+    target.put("metadata", metadata);
+    return medusaClient.postAdmin("/admin/products/" + productId, body);
+  }
+
   private void attachCustomer(UUID userId, String email, Map<String, Object> body) {
     if (userId != null) {
       Map<String, Object> metadata = extractMetadata(body);
@@ -167,6 +199,30 @@ public class StoreService {
       return copy;
     }
     return new LinkedHashMap<>();
+  }
+
+  private Map<String, Object> resolveProductPayload(Map<String, Object> body) {
+    Object productObject = body.get("product");
+    if (productObject instanceof Map<?, ?> productMap) {
+      Map<String, Object> normalized = new LinkedHashMap<>();
+      for (Map.Entry<?, ?> entry : productMap.entrySet()) {
+        if (entry.getKey() != null) {
+          normalized.put(entry.getKey().toString(), entry.getValue());
+        }
+      }
+      body.put("product", normalized);
+      return normalized;
+    }
+    return body;
+  }
+
+  private void assertSellerOwnsProduct(UUID sellerId, String productId) {
+    JsonNode response = medusaClient.getAdmin("/admin/products/" + productId);
+    JsonNode sellerNode = response.path("product").path("metadata").path("kobo_seller_id");
+    String owner = sellerNode.isMissingNode() || sellerNode.isNull() ? null : sellerNode.asText();
+    if (StringUtils.hasText(owner) && !sellerId.toString().equals(owner)) {
+      throw new StoreException(HttpStatus.FORBIDDEN, "You cannot update another seller product");
+    }
   }
 
   private void storeCustomerMapping(UUID userId, JsonNode response) {
