@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import static org.springframework.security.web.util.matcher.AntPathRequestMatcher.antMatcher;
 
 @Configuration
 @EnableMethodSecurity
@@ -28,15 +29,20 @@ public class SecurityConfig {
     http
       .csrf(csrf -> csrf.disable())
       .authorizeHttpRequests(auth -> auth
-        .requestMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+        .requestMatchers(
+          antMatcher("/actuator/**"),
+          antMatcher("/v3/api-docs/**"),
+          antMatcher("/swagger-ui/**"),
+          antMatcher("/swagger-ui.html"),
+          antMatcher("/error"))
           .permitAll()
-        .requestMatchers("/api/admin/**")
+        .requestMatchers(antMatcher("/api/admin/**"))
           .hasRole("ADMIN")
-        .requestMatchers("/api/auth/**")
+        .requestMatchers(antMatcher("/api/auth/**"))
           .permitAll()
-        .requestMatchers("/api/public/**")
+        .requestMatchers(antMatcher("/api/public/**"))
           .permitAll()
-        .requestMatchers("/api/webhooks/**")
+        .requestMatchers(antMatcher("/api/webhooks/**"))
           .permitAll()
         .anyRequest()
           .authenticated()
