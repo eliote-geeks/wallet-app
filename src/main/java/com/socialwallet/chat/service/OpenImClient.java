@@ -24,6 +24,7 @@ public class OpenImClient {
   private final OpenImProperties properties;
 
   private volatile String cachedAdminToken;
+  private volatile String cachedAdminImToken;
   private volatile Instant cachedAdminTokenExpiresAt;
 
   public String getAdminToken() {
@@ -36,19 +37,23 @@ public class OpenImClient {
         && Instant.now().isBefore(cachedAdminTokenExpiresAt)) {
         return cachedAdminToken;
       }
-      AdminLoginRequest request = new AdminLoginRequest();
-      request.setAccount(properties.getAdminAccount());
-      request.setPassword(properties.getAdminPasswordHash());
-      request.setVersion(properties.getAdminVersion());
-      AdminLoginResponse response = post(
-        properties.getAdminBaseUrl() + "/account/login",
-        request,
-        null,
-        new ParameterizedTypeReference<OpenImResponse<AdminLoginResponse>>() {}
-      );
-      cachedAdminToken = response.getAdminToken();
-      cachedAdminTokenExpiresAt = Instant.now().plusSeconds(properties.getAdminTokenTtlSeconds());
+      refreshAdminTokens();
       return cachedAdminToken;
+    }
+  }
+
+  public String getAdminImToken() {
+    if (cachedAdminImToken != null && cachedAdminTokenExpiresAt != null
+      && Instant.now().isBefore(cachedAdminTokenExpiresAt)) {
+      return cachedAdminImToken;
+    }
+    synchronized (this) {
+      if (cachedAdminImToken != null && cachedAdminTokenExpiresAt != null
+        && Instant.now().isBefore(cachedAdminTokenExpiresAt)) {
+        return cachedAdminImToken;
+      }
+      refreshAdminTokens();
+      return cachedAdminImToken;
     }
   }
 
@@ -77,6 +82,36 @@ public class OpenImClient {
       getAdminToken(),
       new ParameterizedTypeReference<OpenImResponse<Object>>() {}
     );
+  }
+
+  public SendMessageResponse sendMessage(SendMessageRequest request) {
+    String token = getAdminImToken();
+    String endpoint = properties.getRestBaseUrl();
+    if (endpoint == null || endpoint.isBlank()) {
+      throw new OpenImException(org.springframework.http.HttpStatus.BAD_GATEWAY, "OpenIM rest base URL is missing");
+    }
+    return post(
+      endpoint + "/msg/send_msg",
+      request,
+      token,
+      new ParameterizedTypeReference<OpenImResponse<SendMessageResponse>>() {}
+    );
+  }
+
+  private void refreshAdminTokens() {
+    AdminLoginRequest request = new AdminLoginRequest();
+    request.setAccount(properties.getAdminAccount());
+    request.setPassword(properties.getAdminPasswordHash());
+    request.setVersion(properties.getAdminVersion());
+    AdminLoginResponse response = post(
+      properties.getAdminBaseUrl() + "/account/login",
+      request,
+      null,
+      new ParameterizedTypeReference<OpenImResponse<AdminLoginResponse>>() {}
+    );
+    cachedAdminToken = response.getAdminToken();
+    cachedAdminImToken = response.getImToken();
+    cachedAdminTokenExpiresAt = Instant.now().plusSeconds(properties.getAdminTokenTtlSeconds());
   }
 
   private <T> T post(
@@ -126,6 +161,7 @@ public class OpenImClient {
   @Data
   public static class AdminLoginResponse {
     private String adminToken;
+    private String imToken;
   }
 
   @Data
@@ -192,5 +228,46 @@ public class OpenImClient {
     private String userId;
     private String imToken;
     private String chatToken;
+  }
+
+  @Data
+  public static class SendMessageRequest {
+    @JsonProperty("sendID")
+    private String sendId;
+    @JsonProperty("recvID")
+    private String recvId;
+    @JsonProperty("groupID")
+    private String groupId;
+    private CustomElem content;
+    private int contentType;
+    private int sessionType;
+    private boolean isOnlineOnly;
+    private boolean notOfflinePush;
+    private OfflinePushInfo offlinePushInfo;
+  }
+
+  @Data
+  public static class CustomElem {
+    private String Data;
+    private String Description;
+    private String Extension;
+  }
+
+  @Data
+  public static class OfflinePushInfo {
+    private String title;
+    private String desc;
+    private String ex;
+    private String iOSPushSound;
+    private boolean iOSBadgeCount;
+  }
+
+  @Data
+  public static class SendMessageResponse {
+    @JsonProperty("serverMsgID")
+    private String serverMsgId;
+    @JsonProperty("clientMsgID")
+    private String clientMsgId;
+    private Long sendTime;
   }
 }

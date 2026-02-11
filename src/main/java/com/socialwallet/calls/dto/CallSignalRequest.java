@@ -1,5 +1,6 @@
 package com.socialwallet.calls.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 import lombok.Data;
@@ -9,7 +10,7 @@ public class CallSignalRequest {
   @NotNull
   private UUID callId;
 
-  @NotNull
+  @NotBlank
   private String roomName;
 
   @NotNull

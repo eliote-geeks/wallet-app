@@ -14,6 +14,9 @@ public class CallSignalResponse {
   private Long senderOpenimUserId;
   private UUID targetUserId;
   private Long targetOpenimUserId;
+  private String status;
+  private Long durationSeconds;
+  private boolean sent;
   private Instant createdAt;
   private Map<String, Object> openimPayload;
 }

@@ -13,16 +13,18 @@ Objectif:
    - `POST /api/calls/token` avec `{ "roomName": "...", "audioOnly": true|false }`
 
 ### 2) Flux appel (signalisation OpenIM)
-1. Caller demande un payload d invitation:
+1. Caller appelle:
    - `POST /api/calls/invite`
-   - Payload OpenIM renvoye dans `openimPayload`
-2. Le client envoie `openimPayload` via un **custom message** OpenIM.
-3. Callee recoit l invite (custom message), affiche l ecran d appel.
-4. Callee accepte/refuse:
-   - `POST /api/calls/respond` -> payload OpenIM a envoyer au caller.
-5. Caller recoit la reponse:
+   - Le backend envoie directement le custom message via OpenIM.
+2. Callee recoit l invite (custom message), affiche l ecran d appel.
+3. Callee accepte/refuse:
+   - `POST /api/calls/respond`
+   - Le backend envoie directement le signal OpenIM au caller.
+4. Caller recoit la reponse:
    - `ACCEPT` -> les deux joignent la room LiveKit
    - `DECLINE/BUSY/CANCEL/END` -> fermer l UI.
+5. Historique:
+   - `GET /api/calls/history` pour afficher la liste (statut + duree).
 
 ### 3) LiveKit (audio/video)
 - Audio-only: publier uniquement le micro.
@@ -52,3 +54,4 @@ Objectif:
 ### 6) Notes
 - LiveKit gere les appels audio **et** video.
 - OpenIM reste la source de verite pour la signalisation (invites, fin d appel).
+- Le backend persiste `call_history` pour suivre statut/duree.

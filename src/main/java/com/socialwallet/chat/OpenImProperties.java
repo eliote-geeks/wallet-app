@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app.openim")
 public class OpenImProperties {
   private boolean enabled = true;
+  private String restBaseUrl = "http://localhost:10002";
   private String chatBaseUrl = "http://localhost:10008";
   private String adminBaseUrl = "http://localhost:10009";
   private String adminAccount = "chatAdmin";

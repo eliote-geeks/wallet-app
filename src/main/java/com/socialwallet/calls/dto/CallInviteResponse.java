@@ -14,6 +14,8 @@ public class CallInviteResponse {
   private Long callerOpenimUserId;
   private UUID recipientUserId;
   private Long recipientOpenimUserId;
+  private String status;
+  private boolean sent;
   private Instant createdAt;
   private Map<String, Object> openimPayload;
 }

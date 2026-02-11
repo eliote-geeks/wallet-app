@@ -53,6 +53,7 @@ app:
       debug: ${OTP_DEBUG:true}
   openim:
     enabled: ${OPENIM_ENABLED:true}
+    rest-base-url: ${OPENIM_REST_URL:http://localhost:10002}
     chat-base-url: ${OPENIM_CHAT_URL:http://localhost:10008}
     admin-base-url: ${OPENIM_ADMIN_URL:http://localhost:10009}
     admin-account: ${OPENIM_ADMIN_ACCOUNT:chatAdmin}

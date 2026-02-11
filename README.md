@@ -65,6 +65,7 @@ docker compose up -d
 
 ## OpenIM (backend)
 Variables utiles (dev):
+- `OPENIM_REST_URL` (default `http://localhost:10002`)
 - `OPENIM_CHAT_URL` (default `http://localhost:10008`)
 - `OPENIM_ADMIN_URL` (default `http://localhost:10009`)
 - `OPENIM_ADMIN_ACCOUNT` / `OPENIM_ADMIN_PASSWORD_HASH` (defaut `chatAdmin` / md5)
@@ -123,8 +124,9 @@ Le JWK set est lu sur:
 - Endpoint token: `POST /api/calls/token` (JWT requis) payload: `{ "roomName": "call-123", "audioOnly": true }`
 - Response: `{ "roomName", "identity", "token", "livekitUrl" }`
 - Signalisation OpenIM:
-  - `POST /api/calls/invite` -> payload OpenIM a envoyer au destinataire
-  - `POST /api/calls/respond` -> payload OpenIM a renvoyer au caller (accept/decline/busy/cancel/end)
+  - `POST /api/calls/invite` -> envoi reel du message d invite via OpenIM + persistance historique
+  - `POST /api/calls/respond` -> envoi reel via OpenIM + mise a jour historique (accept/decline/busy/cancel/end)
+  - `GET /api/calls/history` -> historique des appels (statut, duree, initiateur, destinataire)
 
 ## Wallet (dev)
 - `GET /api/wallet/balance` (JWT requis) -> liste des soldes par devise
