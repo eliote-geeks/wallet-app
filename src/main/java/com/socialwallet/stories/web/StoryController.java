@@ -9,11 +9,13 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
+import static com.socialwallet.config.RbacExpressions.PLATFORM_USER;
 
 /**
  * REST controller for Stories (WhatsApp Status model).
@@ -22,6 +24,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/stories")
 @RequiredArgsConstructor
+@PreAuthorize(PLATFORM_USER)
 public class StoryController {
 
     private final StoryService storyService;

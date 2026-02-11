@@ -119,6 +119,13 @@ Le JWK set est lu sur:
 - Inscription/login par numero de telephone (format E.164 recommande, ex: `+237...`).
 - Email optionnel.
 
+## RBAC (dev)
+- Roles applicatifs: `USER`, `SELLER`, `MODERATOR`, `ADMIN`.
+- Les roles Keycloak dans le JWT sont normalises en backend pour eviter les ecarts de casse (`user` == `USER`).
+- Endpoints admin: `/api/admin/**` -> role `ADMIN` obligatoire.
+- Endpoints metier proteges (`/api/profiles/**`, `/api/stories/**`, `/api/messaging/**`, `/api/calls/**`, `/api/wallet/**`, `/api/payments/mobile-money/**`, `/api/store/**`, `/api/private/**`, `/api/auth/me`) -> un role parmi `USER|SELLER|MODERATOR|ADMIN`.
+- Endpoints publics: `/api/public/**`, `/api/webhooks/**`, endpoints d auth publics (`/api/auth/register`, `/api/auth/verify-otp`, `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout`).
+
 ## LiveKit (appels audio/video)
 - Lancer LiveKit: `docker compose -f infra/livekit/docker-compose.yml up -d`
 - Endpoint token: `POST /api/calls/token` (JWT requis) payload: `{ "roomName": "call-123", "audioOnly": true }`

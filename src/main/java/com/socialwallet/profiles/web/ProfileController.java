@@ -7,12 +7,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
+import static com.socialwallet.config.RbacExpressions.PLATFORM_USER;
 
 /**
  * REST controller for Profiles & Contacts.
@@ -21,6 +23,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/profiles")
 @RequiredArgsConstructor
+@PreAuthorize(PLATFORM_USER)
 public class ProfileController {
 
     private final ProfileService profileService;

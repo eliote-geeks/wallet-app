@@ -2,8 +2,11 @@ package com.socialwallet.config;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -27,6 +30,8 @@ public class SecurityConfig {
       .authorizeHttpRequests(auth -> auth
         .requestMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
           .permitAll()
+        .requestMatchers("/api/admin/**")
+          .hasRole("ADMIN")
         .requestMatchers("/api/auth/**")
           .permitAll()
         .requestMatchers("/api/public/**")
@@ -53,14 +58,19 @@ public class SecurityConfig {
       if (!(roles instanceof Collection<?> roleValues)) {
         return List.of();
       }
-      List<GrantedAuthority> authorities = new ArrayList<>();
+      Set<GrantedAuthority> authorities = new LinkedHashSet<>();
       for (Object role : roleValues) {
         if (role == null) {
           continue;
         }
-        authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+        String roleName = role.toString().trim();
+        if (roleName.isEmpty()) {
+          continue;
+        }
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + roleName));
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + roleName.toUpperCase(Locale.ROOT)));
       }
-      return authorities;
+      return List.copyOf(authorities);
     };
 
     JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
