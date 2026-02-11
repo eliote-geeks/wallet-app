@@ -292,6 +292,30 @@ public class StoreService {
     return medusaClient.postAdmin("/admin/products/" + productId, body);
   }
 
+  public JsonNode moderateArchiveProduct(String productId,
+                                         UUID moderatorUserId,
+                                         UUID reportId,
+                                         String reasonCode,
+                                         String moderationAction) {
+    if (!StringUtils.hasText(productId)) {
+      throw new StoreException(HttpStatus.BAD_REQUEST, "productId is required");
+    }
+    JsonNode productResponse = medusaClient.getAdmin("/admin/products/" + productId);
+    JsonNode productNode = productResponse.path("product");
+    Map<String, Object> metadata = extractMetadata(productNode.path("metadata"));
+    metadata.put("kobo_moderated", true);
+    metadata.put("kobo_moderation_action", moderationAction);
+    metadata.put("kobo_moderation_reason", reasonCode);
+    metadata.put("kobo_moderation_report_id", reportId != null ? reportId.toString() : null);
+    metadata.put("kobo_moderation_moderator_id", moderatorUserId != null ? moderatorUserId.toString() : null);
+    metadata.put("kobo_moderation_at", Instant.now().toString());
+
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("status", "draft");
+    body.put("metadata", metadata);
+    return medusaClient.postAdmin("/admin/products/" + productId, body);
+  }
+
   private void attachCustomer(UUID userId, String email, Map<String, Object> body) {
     if (userId != null) {
       Map<String, Object> metadata = extractMetadata(body);

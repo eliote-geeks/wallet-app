@@ -243,6 +243,28 @@ public class StoryService {
         log.info("Story deleted: id={}, authorId={}", storyId, authorId);
     }
 
+    @Transactional
+    public void moderatorDeleteStory(UUID storyId, UUID moderatorUserId) {
+        Story story = storyRepository.findById(storyId)
+            .orElseThrow(() -> new IllegalArgumentException("Story not found"));
+
+        hiddenFromRepository.deleteByStoryId(storyId);
+        sharedWithRepository.deleteByStoryId(storyId);
+        storyViewRepository.deleteByStoryId(storyId);
+        storyRepository.delete(story);
+        log.info("Story removed by moderation: id={}, moderatorId={}", storyId, moderatorUserId);
+    }
+
+    @Transactional
+    public Story moderatorHideStory(UUID storyId, UUID moderatorUserId) {
+        Story story = storyRepository.findById(storyId)
+            .orElseThrow(() -> new IllegalArgumentException("Story not found"));
+        story.setExpiresAt(LocalDateTime.now());
+        Story saved = storyRepository.save(story);
+        log.info("Story hidden by moderation: id={}, moderatorId={}", storyId, moderatorUserId);
+        return saved;
+    }
+
     @Transactional(readOnly = true)
     public List<StoryViewDto> getStoryViewers(UUID authorId, UUID storyId) {
         Story story = storyRepository.findById(storyId)

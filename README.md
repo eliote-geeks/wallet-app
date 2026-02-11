@@ -156,6 +156,12 @@ Le JWK set est lu sur:
 - `PATCH /api/moderation/reports/{reportId}/status` (MODERATOR|ADMIN) ->
   decision de moderation (statuts autorises: `IN_REVIEW`, `RESOLVED`, `REJECTED`) avec
   `actionType` (`NONE`, `WARNING`, `CONTENT_REMOVED`, `CONTENT_HIDDEN`, `USER_TEMP_SUSPENDED`, `USER_BANNED`).
+- `GET /api/moderation/reports/{reportId}/actions` (MODERATOR|ADMIN) -> historique d execution des actions auto.
+- Actions auto actuellement connectees:
+  - `STORY` -> `CONTENT_HIDDEN` (expire immediate) / `CONTENT_REMOVED` (suppression)
+  - `STORE_PRODUCT` -> archivage soft dans Medusa (`status=draft` + metadata moderation)
+  - `PROFILE` -> `USER_TEMP_SUSPENDED` / `USER_BANNED` (status compte backend)
+- Si l execution auto echoue, le statut du report n est pas valide en `RESOLVED` (erreur API + trace audit).
 
 ## Wallet (dev)
 - `GET /api/wallet/balance` (JWT requis) -> liste des soldes par devise

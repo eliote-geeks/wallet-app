@@ -4,6 +4,8 @@ import com.socialwallet.identity.repository.UserAccountRepository;
 import com.socialwallet.moderation.ModerationException;
 import com.socialwallet.moderation.dto.ModerationReportCreateRequest;
 import com.socialwallet.moderation.dto.ModerationReportDecisionRequest;
+import com.socialwallet.moderation.model.ModerationActionLog;
+import com.socialwallet.moderation.model.ModerationActionLogExecutionStatus;
 import com.socialwallet.moderation.model.ModerationActionType;
 import com.socialwallet.moderation.model.ModerationReport;
 import com.socialwallet.moderation.model.ModerationReportStatus;
@@ -27,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class ModerationService {
   private final ModerationReportRepository moderationReportRepository;
   private final UserAccountRepository userAccountRepository;
+  private final ModerationActionExecutor moderationActionExecutor;
+  private final ModerationActionLogService moderationActionLogService;
 
   @Transactional
   public ModerationReport createReport(UUID reporterUserId, ModerationReportCreateRequest request) {
@@ -88,8 +92,28 @@ public class ModerationService {
     ModerationReport report = moderationReportRepository.findById(reportId)
       .orElseThrow(() -> new ModerationException(HttpStatus.NOT_FOUND, "Moderation report not found"));
     validateTargetStatus(request.getStatus());
+    ModerationActionType actionType = request.getActionType() == null ? ModerationActionType.NONE : request.getActionType();
+    validateActionForStatus(request.getStatus(), actionType);
+
+    ModerationActionExecutor.ExecutionResult executionResult = buildDefaultExecution(request.getStatus(), actionType);
+    if (request.getStatus() == ModerationReportStatus.RESOLVED) {
+      executionResult = moderationActionExecutor.execute(report, actionType, moderatorUserId);
+    }
+    moderationActionLogService.record(
+      report.getId(),
+      moderatorUserId,
+      report.getTargetType(),
+      report.getTargetId(),
+      actionType,
+      executionResult.status(),
+      executionResult.details()
+    );
+    if (executionResult.status() == ModerationActionLogExecutionStatus.FAILED) {
+      throw new ModerationException(HttpStatus.BAD_GATEWAY, executionResult.details());
+    }
+
     report.setStatus(request.getStatus());
-    report.setActionType(request.getActionType() == null ? ModerationActionType.NONE : request.getActionType());
+    report.setActionType(actionType);
     report.setAssignedModeratorUserId(moderatorUserId);
     report.setResolutionNote(trimToNull(request.getResolutionNote()));
     if (request.getStatus() == ModerationReportStatus.RESOLVED || request.getStatus() == ModerationReportStatus.REJECTED) {
@@ -100,6 +124,17 @@ public class ModerationService {
     return moderationReportRepository.save(report);
   }
 
+  @Transactional(readOnly = true)
+  public List<ModerationActionLog> listActionLogs(UUID reportId) {
+    if (reportId == null) {
+      throw new ModerationException(HttpStatus.BAD_REQUEST, "reportId is required");
+    }
+    if (!moderationReportRepository.existsById(reportId)) {
+      throw new ModerationException(HttpStatus.NOT_FOUND, "Moderation report not found");
+    }
+    return moderationActionLogService.listForReport(reportId);
+  }
+
   private void validateTargetStatus(ModerationReportStatus status) {
     if (status == null) {
       throw new ModerationException(HttpStatus.BAD_REQUEST, "Status is required");
@@ -107,6 +142,20 @@ public class ModerationService {
     if (status == ModerationReportStatus.OPEN) {
       throw new ModerationException(HttpStatus.BAD_REQUEST, "Use OPEN only for creation");
     }
+  }
+
+  private void validateActionForStatus(ModerationReportStatus status, ModerationActionType actionType) {
+    if (status != ModerationReportStatus.RESOLVED && actionType != ModerationActionType.NONE) {
+      throw new ModerationException(HttpStatus.BAD_REQUEST, "Action type is allowed only when status is RESOLVED");
+    }
+  }
+
+  private ModerationActionExecutor.ExecutionResult buildDefaultExecution(ModerationReportStatus status,
+                                                                         ModerationActionType actionType) {
+    if (actionType == ModerationActionType.NONE) {
+      return ModerationActionExecutor.ExecutionResult.skipped("No automated action requested");
+    }
+    return ModerationActionExecutor.ExecutionResult.skipped("Action not executed for status " + status.name());
   }
 
   private void ensureUserExists(UUID userId) {

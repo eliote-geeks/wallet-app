@@ -120,6 +120,29 @@ class StoreServiceOwnershipTest {
     assertEquals("prod_1", result.path("products").get(0).path("id").asText());
   }
 
+  @Test
+  void moderateArchiveProduct_sets_moderation_metadata() throws Exception {
+    UUID moderatorId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    UUID reportId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    when(medusaClient.getAdmin("/admin/products/prod_mod"))
+      .thenReturn(json("{\"product\":{\"id\":\"prod_mod\",\"metadata\":{\"kobo_seller_id\":\"11111111-1111-1111-1111-111111111111\"}}}"));
+    when(medusaClient.postAdmin(eq("/admin/products/prod_mod"), any()))
+      .thenReturn(json("{\"product\":{\"id\":\"prod_mod\"}}"));
+
+    storeService.moderateArchiveProduct("prod_mod", moderatorId, reportId, "SCAM", "CONTENT_REMOVED");
+
+    ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(medusaClient).postAdmin(eq("/admin/products/prod_mod"), bodyCaptor.capture());
+    Map<String, Object> sent = bodyCaptor.getValue();
+    assertEquals("draft", sent.get("status"));
+    Map<?, ?> metadata = (Map<?, ?>) sent.get("metadata");
+    assertEquals(true, metadata.get("kobo_moderated"));
+    assertEquals("CONTENT_REMOVED", metadata.get("kobo_moderation_action"));
+    assertEquals("SCAM", metadata.get("kobo_moderation_reason"));
+    assertEquals(reportId.toString(), metadata.get("kobo_moderation_report_id"));
+    assertEquals(moderatorId.toString(), metadata.get("kobo_moderation_moderator_id"));
+  }
+
   private JsonNode json(String value) throws Exception {
     return objectMapper.readTree(value);
   }

@@ -4,6 +4,8 @@ import com.socialwallet.config.SecurityConfig;
 import com.socialwallet.moderation.dto.ModerationReportCreateRequest;
 import com.socialwallet.moderation.dto.ModerationReportDecisionRequest;
 import com.socialwallet.moderation.model.ModerationActionType;
+import com.socialwallet.moderation.model.ModerationActionLog;
+import com.socialwallet.moderation.model.ModerationActionLogExecutionStatus;
 import com.socialwallet.moderation.model.ModerationReport;
 import com.socialwallet.moderation.model.ModerationReportStatus;
 import com.socialwallet.moderation.model.ModerationTargetType;
@@ -126,6 +128,39 @@ class ModerationControllerRbacIntegrationTest {
       .andExpect(jsonPath("$.assignedModeratorUserId").value(ADMIN_ID.toString()));
 
     verify(moderationService).updateStatus(eq(ADMIN_ID), eq(REPORT_ID), any(ModerationReportDecisionRequest.class));
+  }
+
+  @Test
+  void listActions_forbidden_forSimpleUser() throws Exception {
+    mockMvc.perform(get("/api/moderation/reports/{reportId}/actions", REPORT_ID)
+        .with(userJwt()))
+      .andExpect(status().isForbidden());
+
+    verify(moderationService, never()).listActionLogs(eq(REPORT_ID));
+  }
+
+  @Test
+  void listActions_allowed_forModerator() throws Exception {
+    ModerationActionLog logRow = new ModerationActionLog();
+    logRow.setId(UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
+    logRow.setReportId(REPORT_ID);
+    logRow.setModeratorUserId(MODERATOR_ID);
+    logRow.setTargetType(ModerationTargetType.CHAT_MESSAGE);
+    logRow.setTargetId("msg_123");
+    logRow.setActionType(ModerationActionType.CONTENT_HIDDEN);
+    logRow.setExecutionStatus(ModerationActionLogExecutionStatus.FAILED);
+    logRow.setDetails("CONTENT_HIDDEN not implemented for target CHAT_MESSAGE");
+    logRow.setCreatedAt(Instant.parse("2026-02-11T18:10:00Z"));
+
+    when(moderationService.listActionLogs(REPORT_ID)).thenReturn(List.of(logRow));
+
+    mockMvc.perform(get("/api/moderation/reports/{reportId}/actions", REPORT_ID)
+        .with(moderatorJwt()))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$[0].reportId").value(REPORT_ID.toString()))
+      .andExpect(jsonPath("$[0].executionStatus").value("FAILED"));
+
+    verify(moderationService).listActionLogs(REPORT_ID);
   }
 
   private ModerationReport sampleReport() {

@@ -3,6 +3,8 @@ package com.socialwallet.moderation.web;
 import com.socialwallet.moderation.dto.ModerationReportCreateRequest;
 import com.socialwallet.moderation.dto.ModerationReportDecisionRequest;
 import com.socialwallet.moderation.dto.ModerationReportResponse;
+import com.socialwallet.moderation.dto.ModerationActionLogResponse;
+import com.socialwallet.moderation.model.ModerationActionLog;
 import com.socialwallet.moderation.model.ModerationReport;
 import com.socialwallet.moderation.model.ModerationReportStatus;
 import com.socialwallet.moderation.model.ModerationTargetType;
@@ -79,6 +81,16 @@ public class ModerationController {
     return ResponseEntity.ok(toResponse(updated));
   }
 
+  @GetMapping("/{reportId}/actions")
+  @PreAuthorize(MODERATOR_OR_ADMIN)
+  public ResponseEntity<List<ModerationActionLogResponse>> listActions(@PathVariable UUID reportId) {
+    List<ModerationActionLogResponse> rows = moderationService.listActionLogs(reportId)
+      .stream()
+      .map(this::toActionResponse)
+      .toList();
+    return ResponseEntity.ok(rows);
+  }
+
   private ModerationReportResponse toResponse(ModerationReport row) {
     ModerationReportResponse response = new ModerationReportResponse();
     response.setId(row.getId());
@@ -94,6 +106,20 @@ public class ModerationController {
     response.setResolvedAt(row.getResolvedAt());
     response.setCreatedAt(row.getCreatedAt());
     response.setUpdatedAt(row.getUpdatedAt());
+    return response;
+  }
+
+  private ModerationActionLogResponse toActionResponse(ModerationActionLog row) {
+    ModerationActionLogResponse response = new ModerationActionLogResponse();
+    response.setId(row.getId());
+    response.setReportId(row.getReportId());
+    response.setModeratorUserId(row.getModeratorUserId());
+    response.setTargetType(row.getTargetType());
+    response.setTargetId(row.getTargetId());
+    response.setActionType(row.getActionType());
+    response.setExecutionStatus(row.getExecutionStatus());
+    response.setDetails(row.getDetails());
+    response.setCreatedAt(row.getCreatedAt());
     return response;
   }
 }
