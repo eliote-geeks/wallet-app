@@ -147,6 +147,16 @@ Le JWK set est lu sur:
   - `POST /api/calls/respond` -> envoi reel via OpenIM + mise a jour historique (accept/decline/busy/cancel/end)
   - `GET /api/calls/history` -> historique des appels (statut, duree, initiateur, destinataire)
 
+## Moderation (MVP)
+- `POST /api/moderation/reports` (USER|SELLER|MODERATOR|ADMIN) -> creer un signalement:
+  payload exemple: `{ "targetType":"CHAT_MESSAGE", "targetId":"msg_123", "reasonCode":"SPAM", "description":"Spam links" }`
+- `GET /api/moderation/reports/my` -> liste mes 100 derniers signalements.
+- `GET /api/moderation/reports/queue` (MODERATOR|ADMIN) -> file de moderation filtrable
+  (`status`, `targetType`, `reporterUserId`, `targetId`, pagination).
+- `PATCH /api/moderation/reports/{reportId}/status` (MODERATOR|ADMIN) ->
+  decision de moderation (statuts autorises: `IN_REVIEW`, `RESOLVED`, `REJECTED`) avec
+  `actionType` (`NONE`, `WARNING`, `CONTENT_REMOVED`, `CONTENT_HIDDEN`, `USER_TEMP_SUSPENDED`, `USER_BANNED`).
+
 ## Wallet (dev)
 - `GET /api/wallet/balance` (JWT requis) -> liste des soldes par devise
 - `GET /api/wallet/balance/{currency}` (JWT requis)
