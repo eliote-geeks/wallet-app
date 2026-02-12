@@ -315,6 +315,40 @@ public class WalletPaymentService {
     log.info("Wallet transfer: sender={}, recipient={}, amount={}, currency={}", userId, recipientId, amount, normalizedCurrency);
     return response;
   }
+  @Transactional
+  public WalletTransaction settleToUser(UUID userId,
+                                        String currency,
+                                        Long amount,
+                                        String referenceType,
+                                        String referenceId,
+                                        String metadata) {
+    if (userId == null) {
+      throw new WalletException(HttpStatus.BAD_REQUEST, "userId is required");
+    }
+    if (!StringUtils.hasText(currency)) {
+      throw new WalletException(HttpStatus.BAD_REQUEST, "currency is required");
+    }
+    if (amount == null || amount <= 0) {
+      throw new WalletException(HttpStatus.BAD_REQUEST, "amount must be greater than 0");
+    }
+    if (!StringUtils.hasText(referenceId)) {
+      throw new WalletException(HttpStatus.BAD_REQUEST, "referenceId is required");
+    }
+
+    String normalizedCurrency = normalizeCurrency(currency);
+    WalletAccount beneficiary = getOrCreateAccount(userId, normalizedCurrency);
+    WalletAccount systemAccount = getOrCreateAccount(SYSTEM_USER_ID, normalizedCurrency);
+
+    WalletTransaction tx = recordTransaction(userId, WalletTransactionType.SETTLEMENT, WalletTransactionStatus.COMPLETED,
+      normalizedCurrency, amount, referenceType, referenceId, metadata);
+    recordEntry(tx, systemAccount, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.DEBIT, amount, "Settlement");
+    recordEntry(tx, beneficiary, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.CREDIT, amount, "Settlement");
+
+    log.info("Wallet settlement: userId={}, amount={}, currency={}, referenceType={}, referenceId={}",
+      userId, amount, normalizedCurrency, referenceType, referenceId);
+    return tx;
+  }
+
 
   @Transactional(readOnly = true)
   public WalletBalanceDto getBalance(UUID userId, String currency) {

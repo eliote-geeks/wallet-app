@@ -6,7 +6,9 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.socialwallet.store.StoreException;
 import com.socialwallet.store.model.StoreCustomerMapping;
+import com.socialwallet.store.model.StoreProductOwnership;
 import com.socialwallet.store.repository.StoreCustomerMappingRepository;
+import com.socialwallet.store.repository.StoreProductOwnershipRepository;
 import com.socialwallet.wallet.WalletException;
 import com.socialwallet.wallet.application.WalletPaymentService;
 import java.time.Instant;
@@ -31,6 +33,7 @@ import org.springframework.util.StringUtils;
 public class StoreService {
   private final MedusaClient medusaClient;
   private final StoreCustomerMappingRepository mappingRepository;
+  private final StoreProductOwnershipRepository productOwnershipRepository;
   private final WalletPaymentService walletPaymentService;
 
   public JsonNode listProducts(MultiValueMap<String, String> params) {
@@ -157,7 +160,10 @@ public class StoreService {
     Map<String, Object> metadata = extractMetadata(target);
     metadata.put("kobo_seller_id", sellerId.toString());
     target.put("metadata", metadata);
-    return medusaClient.postAdmin("/admin/products", body);
+    JsonNode response = medusaClient.postAdmin("/admin/products", body);
+    String productId = response.path("product").path("id").asText(null);
+    upsertProductOwnership(productId, sellerId);
+    return response;
   }
 
   public JsonNode listSellerProducts(UUID sellerId, boolean admin, MultiValueMap<String, String> params) {
@@ -205,7 +211,17 @@ public class StoreService {
       metadata.put("kobo_seller_id", owner);
     }
     target.put("metadata", metadata);
-    return medusaClient.postAdmin("/admin/products/" + productId, body);
+    JsonNode response = medusaClient.postAdmin("/admin/products/" + productId, body);
+    // Keep an internal mapping to avoid needing Medusa admin calls during webhooks.
+    if (StringUtils.hasText(owner)) {
+      try {
+        upsertProductOwnership(productId, UUID.fromString(owner));
+      } catch (IllegalArgumentException ignored) {
+      }
+    } else {
+      upsertProductOwnership(productId, sellerId);
+    }
+    return response;
   }
 
   public JsonNode updateSellerProductPricingAndStock(UUID sellerId,
@@ -597,4 +613,23 @@ public class StoreService {
     mapping.setMedusaCustomerId(customerId);
     mappingRepository.save(mapping);
   }
+
+  private void upsertProductOwnership(String productId, UUID sellerId) {
+    if (!StringUtils.hasText(productId) || sellerId == null) {
+      return;
+    }
+    StoreProductOwnership ownership = productOwnershipRepository.findById(productId).orElse(null);
+    if (ownership == null) {
+      ownership = new StoreProductOwnership();
+      ownership.setProductId(productId);
+      ownership.setSellerUserId(sellerId);
+      productOwnershipRepository.save(ownership);
+      return;
+    }
+    if (!sellerId.equals(ownership.getSellerUserId())) {
+      ownership.setSellerUserId(sellerId);
+      productOwnershipRepository.save(ownership);
+    }
+  }
+
 }

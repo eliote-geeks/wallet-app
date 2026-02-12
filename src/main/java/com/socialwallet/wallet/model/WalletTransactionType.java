@@ -8,5 +8,6 @@ public enum WalletTransactionType {
   CAPTURE,
   RELEASE,
   REFUND,
+  SETTLEMENT,
   ADJUSTMENT
 }

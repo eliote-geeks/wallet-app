@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.socialwallet.store.StoreException;
 import com.socialwallet.store.repository.StoreCustomerMappingRepository;
+import com.socialwallet.store.repository.StoreProductOwnershipRepository;
 import com.socialwallet.wallet.application.WalletPaymentService;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -35,13 +36,19 @@ class StoreServiceOwnershipTest {
   private StoreCustomerMappingRepository mappingRepository;
 
   @Mock
+  private StoreProductOwnershipRepository productOwnershipRepository;
+
+
+  @Mock
   private WalletPaymentService walletPaymentService;
 
   private StoreService storeService;
 
   @BeforeEach
   void setUp() {
-    storeService = new StoreService(medusaClient, mappingRepository, walletPaymentService);
+    storeService = new StoreService(medusaClient, mappingRepository, productOwnershipRepository, walletPaymentService);
+    when(productOwnershipRepository.findById(org.mockito.ArgumentMatchers.anyString()))
+      .thenReturn(java.util.Optional.empty());
   }
 
   @Test

@@ -1,0 +1,9 @@
+package com.socialwallet.store.model;
+
+public enum StoreOrderSellerStatus {
+  PENDING,
+  PAID,
+  SETTLED,
+  CANCELLED,
+  REFUNDED
+}

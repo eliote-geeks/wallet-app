@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
 @Configuration
-@EnableConfigurationProperties(MedusaProperties.class)
+@EnableConfigurationProperties({MedusaProperties.class, StoreSettlementProperties.class})
 public class MedusaConfig {
   @Bean
   public RestClient medusaRestClient(RestClient.Builder builder, MedusaProperties properties) {

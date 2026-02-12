@@ -202,6 +202,15 @@ Le JWK set est lu sur:
 - Ownership strict: un SELLER ne peut lire/modifier/archiver que ses propres produits.
 - Prerequis: `MEDUSA_ADMIN_TOKEN` configure.
 
+### Orders vendeur + settlement (webhooks Medusa)
+- Le backend consomme les webhooks Medusa `order.*`/`payment.*` via `POST /api/webhooks/medusa` pour enregistrer l appartenance `order -> seller(s)` (multi-vendeur).
+- Endpoints vendeur (proteges `SELLER_OR_ADMIN`):
+- `GET /api/store/seller/orders` -> liste mes commandes (filtre `status` optionnel, pagination `page`/`size`).
+- `GET /api/store/seller/orders/{orderId}` -> details commande (items + montants).
+- `GET /api/store/seller/orders/{orderId}/status` -> statut commande.
+- Settlement: sur event `payment.captured`/`order.payment_captured`/`order.completed`, le backend credite automatiquement le wallet du vendeur (net = gross - fee).
+- Fee plateforme: `STORE_PLATFORM_FEE_BPS` (basis points, ex: 500 = 5%).
+
 ## Admin wallet
 - `GET /api/admin/wallet/ledger/diagnostics` (ADMIN) -> compare ledger vs cache
 - `POST /api/admin/wallet/ledger/recalculate` (ADMIN) -> met a jour les colonnes cachees `available_amount`/`reserved_amount`

@@ -79,6 +79,9 @@ app:
       publishable-key: ${MEDUSA_PUBLISHABLE_KEY:}
       admin-token: ${MEDUSA_ADMIN_TOKEN:}
       webhook-secret: ${MEDUSA_WEBHOOK_SECRET:}
+    settlement:
+      platform-fee-bps: ${STORE_PLATFORM_FEE_BPS:0}
+
 
 management:
   endpoints:

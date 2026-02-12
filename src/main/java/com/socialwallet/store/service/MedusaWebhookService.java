@@ -30,6 +30,7 @@ public class MedusaWebhookService {
   private final ObjectMapper objectMapper;
   private final StoreWebhookEventService eventService;
   private final WalletPaymentService walletPaymentService;
+  private final StoreMarketplaceOrderService marketplaceOrderService;
 
   private static final Set<String> CAPTURE_EVENTS = Set.of(
     "payment.captured",
@@ -67,6 +68,7 @@ public class MedusaWebhookService {
       }
       log.info("Medusa webhook received event={} payloadSize={}", event, payload == null ? 0 : payload.length());
       handleWalletEvent(event, payload);
+      marketplaceOrderService.handleMedusaWebhook(event, payload);
     });
   }
 
