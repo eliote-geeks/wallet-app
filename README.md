@@ -220,3 +220,7 @@ Le JWK set est lu sur:
 - `application.yml` utilise des variables d environnement (DB_URL, DB_USER, DB_PASSWORD, KEYCLOAK_ISSUER_URI).
 - `Flyway` est active, le schema sera versionne dans `src/main/resources/db/migration`.
 codex resume 019b3bab-3824-7f41-8a3f-7f44cfe54824
+
+## Deploiement VPS (Docker)
+
+- Guide Hostinger: `docs/deploy/hostinger-vps.md`
