@@ -37,6 +37,23 @@ Services exposes:
 - Keycloak: http://localhost:8082
 - Postgres: localhost:5432
 
+## Redemarage rapide (dev)
+
+Pour eviter un `docker compose up --build` (lent), utilise les scripts:
+
+```bash
+./scripts/dev-up.sh
+./scripts/api-start.sh
+./scripts/status.sh
+```
+
+Arret:
+
+```bash
+./scripts/api-stop.sh
+./scripts/dev-down.sh
+```
+
 ## Messagerie (OpenIM)
 Stack OpenIM (open-source) dans `infra/openim`.
 
