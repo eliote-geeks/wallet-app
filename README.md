@@ -29,6 +29,8 @@ Ce projet est un squelette Spring Boot monolithique avec une architecture modula
 ## Demarrage rapide (Docker)
 
 ```bash
+# Optionnel: override des ports/passwords via .env
+cp .env.example .env
 docker compose up --build
 ```
 
