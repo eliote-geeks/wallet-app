@@ -60,6 +60,15 @@ public class StoreOrderSeller {
   @Column(name = "settled_at")
   private Instant settledAt;
 
+  @Column(name = "reversal_wallet_tx_id")
+  private UUID reversalWalletTxId;
+
+  @Column(name = "reversed_at")
+  private Instant reversedAt;
+
+  @Column(name = "reversal_failure_reason", length = 500)
+  private String reversalFailureReason;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 

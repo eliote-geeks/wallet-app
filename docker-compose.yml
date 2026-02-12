@@ -53,11 +53,18 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8080/realms/social-wallet}
       KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/social-wallet/protocol/openid-connect/certs}
+      MEDUSA_BASE_URL: ${MEDUSA_BASE_URL:-http://host.docker.internal:9000}
+      MEDUSA_PUBLISHABLE_KEY: ${MEDUSA_PUBLISHABLE_KEY:-}
+      MEDUSA_ADMIN_TOKEN: ${MEDUSA_ADMIN_TOKEN:-}
+      MEDUSA_WEBHOOK_SECRET: ${MEDUSA_WEBHOOK_SECRET:-}
+      STORE_PLATFORM_FEE_BPS: ${STORE_PLATFORM_FEE_BPS:-0}
     depends_on:
       db:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${API_PORT:-8080}:8080"
 

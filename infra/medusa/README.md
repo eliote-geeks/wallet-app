@@ -26,7 +26,34 @@ docker compose up -d medusa
 - API Medusa: http://localhost:9000
 
 ## Notes
-- Les ports 5433 (Postgres) et 6381 (Redis) evitent les conflits locaux.
+- Les ports Postgres/Redis exposes sont configurables (defaults: 5434 et 6381) pour eviter les conflits locaux.
 - Le seed configure une region XAF (Central Africa, CM) et des prix en XAF.
 - L admin Medusa et l integration Keycloak seront ajustes plus tard.
 - Pour arreter: `docker compose down`.
+
+
+## Cles API (backend Spring Boot)
+
+Le seed cree 2 cles:
+- une cle *publishable* (pour les endpoints store)
+- une cle *secret* (pour les endpoints admin)
+
+Apres `yarn seed`, Medusa affiche dans la sortie:
+- `KOBO_MEDUSA_PUBLISHABLE_KEY=...`
+- `KOBO_MEDUSA_ADMIN_TOKEN=...`
+
+Cote backend Java, configure:
+- `MEDUSA_PUBLISHABLE_KEY` = valeur de `KOBO_MEDUSA_PUBLISHABLE_KEY`
+- `MEDUSA_ADMIN_TOKEN` = valeur de `KOBO_MEDUSA_ADMIN_TOKEN`
+
+## Webhooks Medusa -> Backend
+
+Le serveur Medusa inclut un subscriber qui forward les events `order.*` / `payment.*` vers
+`KOBO_BACKEND_WEBHOOK_URL` (ex: `http://host.docker.internal:8080/api/webhooks/medusa`).
+
+Variables (dans `infra/medusa/.env`):
+- `KOBO_BACKEND_WEBHOOK_URL`
+- `KOBO_BACKEND_WEBHOOK_SECRET` (optionnel)
+
+Si `KOBO_BACKEND_WEBHOOK_SECRET` est defini, Medusa signe le payload avec HMAC SHA256
+(`x-medusa-signature`). Cote backend, mets la meme valeur dans `MEDUSA_WEBHOOK_SECRET`.

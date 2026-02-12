@@ -5,5 +5,6 @@ public enum StoreOrderSellerStatus {
   PAID,
   SETTLED,
   CANCELLED,
+  REFUND_PENDING,
   REFUNDED
 }

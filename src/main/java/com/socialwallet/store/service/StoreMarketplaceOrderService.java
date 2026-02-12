@@ -102,6 +102,8 @@ public class StoreMarketplaceOrderService {
     if (shouldSettle(event, orderNode)) {
       settleOrder(order, event);
     }
+
+    handleRefundOrCancel(order, event);
   }
 
   @Transactional(readOnly = true)
@@ -250,7 +252,10 @@ public class StoreMarketplaceOrderService {
 
     if (CANCEL_EVENTS.contains(event)) {
       if (sellerOrder.getSettledWalletTxId() != null || current == StoreOrderSellerStatus.SETTLED) {
-        return StoreOrderSellerStatus.REFUNDED;
+        if (sellerOrder.getReversalWalletTxId() != null || current == StoreOrderSellerStatus.REFUNDED) {
+          return StoreOrderSellerStatus.REFUNDED;
+        }
+        return StoreOrderSellerStatus.REFUND_PENDING;
       }
       return StoreOrderSellerStatus.CANCELLED;
     }
@@ -280,6 +285,11 @@ public class StoreMarketplaceOrderService {
       if (sellerOrder.getSettledWalletTxId() != null || sellerOrder.getStatus() == StoreOrderSellerStatus.SETTLED) {
         continue;
       }
+      if (sellerOrder.getStatus() == StoreOrderSellerStatus.CANCELLED
+        || sellerOrder.getStatus() == StoreOrderSellerStatus.REFUND_PENDING
+        || sellerOrder.getStatus() == StoreOrderSellerStatus.REFUNDED) {
+        continue;
+      }
       if (sellerOrder.getNetAmount() == null || sellerOrder.getNetAmount() <= 0) {
         continue;
       }
@@ -304,6 +314,92 @@ public class StoreMarketplaceOrderService {
     }
   }
 
+  private void handleRefundOrCancel(StoreOrder order, String normalizedEvent) {
+    if (order == null || !CANCEL_EVENTS.contains(normalizedEvent)) {
+      return;
+    }
+
+    List<StoreOrderSeller> sellers = orderSellerRepository.findByOrderId(order.getId());
+    if (sellers.isEmpty()) {
+      return;
+    }
+
+    for (StoreOrderSeller sellerOrder : sellers) {
+      boolean settled = sellerOrder.getSettledWalletTxId() != null || sellerOrder.getStatus() == StoreOrderSellerStatus.SETTLED;
+      if (!settled) {
+        if (sellerOrder.getStatus() != StoreOrderSellerStatus.CANCELLED) {
+          sellerOrder.setStatus(StoreOrderSellerStatus.CANCELLED);
+          orderSellerRepository.save(sellerOrder);
+        }
+        continue;
+      }
+
+      if (sellerOrder.getReversalWalletTxId() != null) {
+        if (sellerOrder.getStatus() != StoreOrderSellerStatus.REFUNDED) {
+          sellerOrder.setStatus(StoreOrderSellerStatus.REFUNDED);
+          orderSellerRepository.save(sellerOrder);
+        }
+        continue;
+      }
+
+      if (sellerOrder.getNetAmount() == null || sellerOrder.getNetAmount() <= 0) {
+        sellerOrder.setStatus(StoreOrderSellerStatus.REFUNDED);
+        sellerOrder.setReversedAt(Instant.now());
+        orderSellerRepository.save(sellerOrder);
+        continue;
+      }
+
+      sellerOrder.setStatus(StoreOrderSellerStatus.REFUND_PENDING);
+      orderSellerRepository.save(sellerOrder);
+
+      try {
+        String metadata = buildRefundMetadata(order.getMedusaOrderId(), sellerOrder, normalizedEvent);
+        WalletTransaction reversal = walletPaymentService.refundFromUser(
+          sellerOrder.getSellerUserId(),
+          sellerOrder.getCurrencyCode(),
+          sellerOrder.getNetAmount(),
+          "ORDER",
+          order.getMedusaOrderId(),
+          metadata
+        );
+
+        sellerOrder.setReversalWalletTxId(reversal.getId());
+        sellerOrder.setReversedAt(Instant.now());
+        sellerOrder.setReversalFailureReason(null);
+        sellerOrder.setStatus(StoreOrderSellerStatus.REFUNDED);
+        orderSellerRepository.save(sellerOrder);
+
+        log.info("Marketplace refund reversal: orderId={}, sellerId={}, amount={}, event={}",
+          order.getMedusaOrderId(), sellerOrder.getSellerUserId(), sellerOrder.getNetAmount(), normalizedEvent);
+      } catch (Exception ex) {
+        String reason = ex.getMessage();
+        if (reason != null && reason.length() > 500) {
+          reason = reason.substring(0, 500);
+        }
+        sellerOrder.setReversalFailureReason(reason);
+        sellerOrder.setStatus(StoreOrderSellerStatus.REFUND_PENDING);
+        orderSellerRepository.save(sellerOrder);
+
+        log.warn("Marketplace refund reversal failed: orderId={}, sellerId={}, reason={}",
+          order.getMedusaOrderId(), sellerOrder.getSellerUserId(), ex.getMessage());
+      }
+    }
+  }
+
+  private String buildRefundMetadata(String orderId, StoreOrderSeller sellerOrder, String event) {
+    try {
+      ObjectNode root = objectMapper.createObjectNode();
+      root.put("orderId", orderId);
+      root.put("sellerId", sellerOrder.getSellerUserId().toString());
+      root.put("event", event);
+      root.put("net", sellerOrder.getNetAmount());
+      return objectMapper.writeValueAsString(root);
+    } catch (Exception ex) {
+      return "";
+    }
+  }
+
+
   private String buildSettlementMetadata(String orderId, StoreOrderSeller sellerOrder) {
     try {
       ObjectNode root = objectMapper.createObjectNode();
@@ -319,6 +415,9 @@ public class StoreMarketplaceOrderService {
   }
 
   private boolean shouldSettle(String normalizedEvent, JsonNode orderNode) {
+    if (CANCEL_EVENTS.contains(normalizedEvent)) {
+      return false;
+    }
     if (SETTLE_EVENTS.contains(normalizedEvent)) {
       return true;
     }

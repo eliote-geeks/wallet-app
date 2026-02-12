@@ -212,31 +212,7 @@ export default async function seedDemoData({ container }: ExecArgs) {
         name: "Central Africa",
         geo_zones: [
           {
-            country_code: "gb",
-            type: "country",
-          },
-          {
-            country_code: "de",
-            type: "country",
-          },
-          {
-            country_code: "dk",
-            type: "country",
-          },
-          {
-            country_code: "se",
-            type: "country",
-          },
-          {
-            country_code: "fr",
-            type: "country",
-          },
-          {
-            country_code: "es",
-            type: "country",
-          },
-          {
-            country_code: "it",
+            country_code: "cm",
             type: "country",
           },
         ],
@@ -335,7 +311,7 @@ export default async function seedDemoData({ container }: ExecArgs) {
   });
   logger.info("Finished seeding stock location data.");
 
-  logger.info("Seeding publishable API key data...");
+  logger.info("Seeding API key data...");
   const { result: publishableApiKeyResult } = await createApiKeysWorkflow(
     container
   ).run({
@@ -357,7 +333,23 @@ export default async function seedDemoData({ container }: ExecArgs) {
       add: [defaultSalesChannel[0].id],
     },
   });
-  logger.info("Finished seeding publishable API key data.");
+
+  const { result: secretApiKeyResult } = await createApiKeysWorkflow(container).run({
+    input: {
+      api_keys: [
+        {
+          title: "Backend",
+          type: "secret",
+          created_by: "",
+        },
+      ],
+    },
+  });
+  const secretApiKey = secretApiKeyResult[0];
+
+  logger.info(`KOBO_MEDUSA_PUBLISHABLE_KEY=${publishableApiKey.token}`);
+  logger.info(`KOBO_MEDUSA_ADMIN_TOKEN=${secretApiKey.token}`);
+  logger.info("Finished seeding API key data.");
 
   logger.info("Seeding product data...");
 

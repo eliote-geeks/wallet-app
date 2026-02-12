@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: medusa
       POSTGRES_PASSWORD: medusa
     ports:
-      - "5433:5432"
+      - "${MEDUSA_DB_PORT:-5434}:5432"
     volumes:
       - medusa-db-data:/var/lib/postgresql/data
 
@@ -15,7 +15,7 @@ services:
     image: redis:7
     container_name: medusa-redis
     ports:
-      - "6381:6379"
+      - "${MEDUSA_REDIS_PORT:-6381}:6379"
     volumes:
       - medusa-redis-data:/data
 
@@ -36,6 +36,8 @@ services:
     depends_on:
       - medusa-db
       - medusa-redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   medusa-db-data:
