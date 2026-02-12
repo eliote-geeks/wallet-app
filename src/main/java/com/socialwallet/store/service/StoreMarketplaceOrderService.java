@@ -231,7 +231,7 @@ public class StoreMarketplaceOrderService {
       sellerOrder.setGrossAmount(gross);
       sellerOrder.setPlatformFeeAmount(fee);
       sellerOrder.setNetAmount(net);
-      sellerOrder.setItems(agg.itemsJson);
+      sellerOrder.setItems(agg.itemsNode);
 
       StoreOrderSellerStatus nextStatus = deriveStatus(sellerOrder, normalizedEvent, orderNode);
       sellerOrder.setStatus(nextStatus);
@@ -362,22 +362,20 @@ public class StoreMarketplaceOrderService {
     }
 
     for (Map.Entry<UUID, SellerAggregation> entry : results.entrySet()) {
-      entry.getValue().itemsJson = serializeItems(entry.getValue().items);
+      entry.getValue().itemsNode = serializeItems(entry.getValue().items);
     }
 
     return results;
   }
 
-  private String serializeItems(List<ObjectNode> items) {
-    try {
-      ArrayNode array = objectMapper.createArrayNode();
+  private JsonNode serializeItems(List<ObjectNode> items) {
+    ArrayNode array = objectMapper.createArrayNode();
+    if (items != null) {
       for (ObjectNode node : items) {
         array.add(node);
       }
-      return objectMapper.writeValueAsString(array);
-    } catch (Exception ex) {
-      return "[]";
     }
+    return array;
   }
 
   private ObjectNode toItemSnapshot(JsonNode item, long itemTotal) {
@@ -546,22 +544,18 @@ public class StoreMarketplaceOrderService {
     dto.setCreatedAt(sellerOrder.getCreatedAt());
   }
 
-  private JsonNode parseItems(String itemsJson) {
-    if (!StringUtils.hasText(itemsJson)) {
+  private JsonNode parseItems(JsonNode items) {
+    if (items == null || items.isNull() || items.isMissingNode()) {
       return objectMapper.createArrayNode();
     }
-    try {
-      return objectMapper.readTree(itemsJson);
-    } catch (Exception ex) {
-      return objectMapper.createArrayNode();
-    }
+    return items;
   }
 
   private static class SellerAggregation {
     private final String currency;
     private long grossAmount = 0L;
     private final List<ObjectNode> items = new ArrayList<>();
-    private String itemsJson = "[]";
+    private JsonNode itemsNode;
 
     private SellerAggregation(String currency) {
       this.currency = currency;

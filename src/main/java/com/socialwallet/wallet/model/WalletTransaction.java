@@ -42,7 +42,7 @@ public class WalletTransaction {
   @Column(name = "reference_id", length = 64)
   private String referenceId;
 
-  @Column(name = "metadata", columnDefinition = "jsonb")
+  @Column(name = "metadata", columnDefinition = "text")
   private String metadata;
 
   @Column(name = "created_at", nullable = false)

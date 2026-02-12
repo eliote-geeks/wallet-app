@@ -1,5 +1,6 @@
 package com.socialwallet.store.model;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -12,6 +13,8 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -47,8 +50,9 @@ public class StoreOrderSeller {
   @Column(name = "status", nullable = false, length = 30)
   private StoreOrderSellerStatus status;
 
+  @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "items", columnDefinition = "jsonb")
-  private String items;
+  private JsonNode items;
 
   @Column(name = "settled_wallet_tx_id")
   private UUID settledWalletTxId;
