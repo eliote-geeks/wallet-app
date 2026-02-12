@@ -34,6 +34,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 
 @Service
@@ -46,6 +48,7 @@ public class StoreMarketplaceOrderService {
   private final StoreProductOwnershipRepository productOwnershipRepository;
   private final WalletPaymentService walletPaymentService;
   private final StoreSettlementProperties settlementProperties;
+  private final MedusaClient medusaClient;
 
   private static final Set<String> SETTLE_EVENTS = Set.of(
     "payment.captured",
@@ -90,20 +93,72 @@ public class StoreMarketplaceOrderService {
       return;
     }
 
-    StoreOrder order = upsertOrder(orderNode);
-    Map<UUID, SellerAggregation> sellers = aggregateSellers(orderNode);
+    JsonNode enrichedOrderNode = enrichOrderNodeForProcessing(orderNode, medusaOrderId);
+
+    StoreOrder order = upsertOrder(enrichedOrderNode);
+    Map<UUID, SellerAggregation> sellers = aggregateSellers(enrichedOrderNode);
 
     if (sellers.isEmpty()) {
       log.debug("No seller items found for orderId={} event={}", medusaOrderId, event);
     } else {
-      upsertSellerOrders(order, sellers, event, orderNode);
+      upsertSellerOrders(order, sellers, event, enrichedOrderNode);
     }
 
-    if (shouldSettle(event, orderNode)) {
+    if (shouldSettle(event, enrichedOrderNode)) {
       settleOrder(order, event);
     }
 
     handleRefundOrCancel(order, event);
+  }
+
+  private JsonNode enrichOrderNodeForProcessing(JsonNode orderNode, String medusaOrderId) {
+    JsonNode items = orderNode != null ? orderNode.path("items") : null;
+    if (itemsHaveQuantities(items)) {
+      return orderNode;
+    }
+
+    if (!StringUtils.hasText(medusaOrderId)) {
+      return orderNode;
+    }
+
+    try {
+      MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+      params.add("fields", "*items,*items.product,*items.product.metadata,*items.variant,*items.variant.product,*items.variant.product.metadata");
+      JsonNode response = medusaClient.getAdmin("/admin/orders/" + medusaOrderId, params);
+      JsonNode adminOrder = response != null ? response.path("order") : null;
+      JsonNode adminItems = adminOrder != null ? adminOrder.path("items") : null;
+
+      if (adminItems == null || !adminItems.isArray() || adminItems.isEmpty()) {
+        return orderNode;
+      }
+
+      if (orderNode != null && orderNode.isObject()) {
+        ObjectNode copy = ((ObjectNode) orderNode).deepCopy();
+        copy.set("items", adminItems);
+        return copy;
+      }
+
+      return adminOrder != null && !adminOrder.isMissingNode() && !adminOrder.isNull() ? adminOrder : orderNode;
+    } catch (Exception ex) {
+      log.warn("Unable to enrich Medusa order payload for orderId={}: {}", medusaOrderId, ex.getMessage());
+      return orderNode;
+    }
+  }
+
+  private boolean itemsHaveQuantities(JsonNode items) {
+    if (items == null || !items.isArray() || items.isEmpty()) {
+      return false;
+    }
+    for (JsonNode item : items) {
+      if (item == null || item.isNull() || item.isMissingNode()) {
+        return false;
+      }
+      JsonNode quantity = item.get("quantity");
+      if (quantity == null || !quantity.isNumber()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Transactional(readOnly = true)
@@ -229,7 +284,8 @@ public class StoreMarketplaceOrderService {
       long fee = computePlatformFee(gross);
       long net = Math.max(gross - fee, 0L);
 
-      sellerOrder.setCurrencyCode(order.getCurrencyCode() != null ? order.getCurrencyCode() : agg.currency);
+      String sellerCurrency = firstNonBlank(order.getCurrencyCode(), agg.currency, sellerOrder.getCurrencyCode());
+      sellerOrder.setCurrencyCode(sellerCurrency);
       sellerOrder.setGrossAmount(gross);
       sellerOrder.setPlatformFeeAmount(fee);
       sellerOrder.setNetAmount(net);

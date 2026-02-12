@@ -135,9 +135,27 @@ public class MedusaClient {
         "MEDUSA_ADMIN_TOKEN is not configured");
     }
     String tokenValue = adminToken.trim();
-    if (tokenValue.toLowerCase(Locale.ROOT).startsWith("bearer ")) {
-      tokenValue = tokenValue.substring(7).trim();
+    String lower = tokenValue.toLowerCase(Locale.ROOT);
+
+    // Medusa v2 supports:
+    // - Admin JWT via Bearer (session/auth flows)
+    // - Secret API keys (sk_...) via HTTP Basic auth (username=sk_..., empty password)
+    if (lower.startsWith("basic ")) {
+      headers.set(HttpHeaders.AUTHORIZATION, tokenValue);
+      return;
     }
+
+    if (lower.startsWith("bearer ")) {
+      headers.setBearerAuth(tokenValue.substring(7).trim());
+      return;
+    }
+
+    if (tokenValue.startsWith("sk_")) {
+      headers.setBasicAuth(tokenValue, "");
+      return;
+    }
+
+    // Fallback: treat as Bearer token.
     headers.setBearerAuth(tokenValue);
   }
 

@@ -200,7 +200,7 @@ Le JWK set est lu sur:
 - `PATCH /api/store/seller/products/{productId}/pricing-stock` -> mise a jour prix/stock (payload `variants`)
 - `POST /api/store/seller/products/{productId}/archive` -> archivage produit (status `draft` + metadata archive)
 - Ownership strict: un SELLER ne peut lire/modifier/archiver que ses propres produits.
-- Prerequis: `MEDUSA_ADMIN_TOKEN` configure.
+- Prerequis: `MEDUSA_ADMIN_TOKEN` configure (secret key Medusa `sk_...` generee via `yarn kobo:keys` dans `infra/medusa/server`).
 
 ### Orders vendeur + settlement (webhooks Medusa)
 - Le backend consomme les webhooks Medusa `order.*`/`payment.*` via `POST /api/webhooks/medusa` pour enregistrer l appartenance `order -> seller(s)` (multi-vendeur).
