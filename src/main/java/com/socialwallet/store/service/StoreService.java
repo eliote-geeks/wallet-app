@@ -35,6 +35,7 @@ public class StoreService {
   private final StoreCustomerMappingRepository mappingRepository;
   private final StoreProductOwnershipRepository productOwnershipRepository;
   private final WalletPaymentService walletPaymentService;
+  private final StoreMarketplaceOrderService marketplaceOrderService;
 
   public JsonNode listProducts(MultiValueMap<String, String> params) {
     return medusaClient.getStore("/store/products", params);
@@ -123,6 +124,7 @@ public class StoreService {
     }
     JsonNode cartResponse = medusaClient.getStore("/store/carts/" + cartId);
     JsonNode cartNode = cartResponse.path("cart");
+    String regionId = cartNode.path("region_id").asText(null);
     String currency = cartNode.path("currency_code").asText(null);
     Long amount = cartNode.path("total").isNumber() ? cartNode.path("total").asLong() : null;
     try {
@@ -134,12 +136,23 @@ public class StoreService {
     JsonNode response;
     try {
       response = medusaClient.postStore("/store/carts/" + cartId + "/complete");
-    } catch (RuntimeException ex) {
-      try {
-        walletPaymentService.release(userId, cartId, ex.getMessage());
-      } catch (WalletException walletEx) {
-        log.warn("Wallet release failed after Medusa error: cartId={}, reason={}", cartId, walletEx.getMessage());
+    } catch (StoreException ex) {
+      // Medusa v2 requires a payment collection + session even for system payments.
+      // For wallet checkout, we transparently create them and retry once.
+      if (isMissingPaymentCollectionError(ex)) {
+        try {
+          ensurePaymentCollectionAndSession(cartId, regionId);
+          response = medusaClient.postStore("/store/carts/" + cartId + "/complete");
+        } catch (RuntimeException retryEx) {
+          releaseWalletHoldQuietly(userId, cartId, retryEx.getMessage());
+          throw retryEx;
+        }
+      } else {
+        releaseWalletHoldQuietly(userId, cartId, ex.getMessage());
+        throw ex;
       }
+    } catch (RuntimeException ex) {
+      releaseWalletHoldQuietly(userId, cartId, ex.getMessage());
       throw ex;
     }
 
@@ -148,7 +161,82 @@ public class StoreService {
     } catch (WalletException ex) {
       log.warn("Wallet capture failed after Medusa success: cartId={}, reason={}", cartId, ex.getMessage());
     }
+
+    // Wallet checkout is an immediate capture on our side, but Medusa might not emit payment.captured
+    // events depending on the payment provider. We trigger a synthetic settlement using Medusa admin
+    // order details so the multi-vendor mapping can settle sellers in dev and production.
+    triggerMarketplaceSettlementFromWalletCheckout(response);
     return response;
+  }
+
+  private void triggerMarketplaceSettlementFromWalletCheckout(JsonNode completeResponse) {
+    if (marketplaceOrderService == null || completeResponse == null) {
+      return;
+    }
+    String orderId = completeResponse.path("order").path("id").asText(null);
+    if (!StringUtils.hasText(orderId)) {
+      return;
+    }
+    try {
+      MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+      params.add("fields", "*items,*items.product,*items.product.metadata,*items.variant,*items.variant.product,*items.variant.product.metadata,payment_status,currency_code");
+      JsonNode adminOrder = medusaClient.getAdmin("/admin/orders/" + orderId, params);
+      marketplaceOrderService.handleMedusaWebhook("payment.captured", adminOrder.toString());
+    } catch (Exception ex) {
+      log.warn("Unable to trigger marketplace settlement for orderId={}: {}", orderId, ex.getMessage());
+    }
+  }
+
+  private void releaseWalletHoldQuietly(UUID userId, String cartId, String reason) {
+    try {
+      walletPaymentService.release(userId, cartId, reason);
+    } catch (WalletException walletEx) {
+      log.warn("Wallet release failed after Medusa error: cartId={}, reason={}", cartId, walletEx.getMessage());
+    }
+  }
+
+  private boolean isMissingPaymentCollectionError(StoreException ex) {
+    if (ex == null) {
+      return false;
+    }
+    if (ex.getStatus() != HttpStatus.BAD_REQUEST) {
+      return false;
+    }
+    String message = ex.getMessage();
+    return message != null && message.contains("Payment collection has not been initiated");
+  }
+
+  private void ensurePaymentCollectionAndSession(String cartId, String regionId) {
+    JsonNode collectionResponse = createPaymentCollection(cartId, null);
+    String collectionId = collectionResponse.path("payment_collection").path("id").asText(null);
+    if (!StringUtils.hasText(collectionId)) {
+      throw new StoreException(HttpStatus.BAD_GATEWAY, "Unable to initialize Medusa payment collection");
+    }
+
+    String providerId = resolveDefaultPaymentProvider(regionId);
+    Map<String, Object> sessionPayload = new LinkedHashMap<>();
+    sessionPayload.put("provider_id", providerId);
+    createPaymentSession(collectionId, sessionPayload);
+  }
+
+  private String resolveDefaultPaymentProvider(String regionId) {
+    // Default Medusa system provider in our seed.
+    String fallback = "pp_system_default";
+    if (!StringUtils.hasText(regionId)) {
+      return fallback;
+    }
+
+    LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+    params.add("region_id", regionId);
+    JsonNode response = listPaymentProviders(params);
+    JsonNode providers = response.path("payment_providers");
+    if (providers.isArray() && !providers.isEmpty()) {
+      String id = providers.get(0).path("id").asText(null);
+      if (StringUtils.hasText(id)) {
+        return id;
+      }
+    }
+    return fallback;
   }
 
   public JsonNode createSellerProduct(UUID sellerId, Map<String, Object> payload) {

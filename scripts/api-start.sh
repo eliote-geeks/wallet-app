@@ -6,6 +6,14 @@ cd "$ROOT_DIR"
 
 mkdir -p .runtime
 
+# Load local environment overrides if present (file is gitignored).
+if [ -f ".env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "./.env"
+  set +a
+fi
+
 PID_FILE=".runtime/api.pid"
 LOG_FILE=".runtime/api.log"
 

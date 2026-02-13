@@ -38,6 +38,8 @@ class StoreServiceOwnershipTest {
   @Mock
   private StoreProductOwnershipRepository productOwnershipRepository;
 
+  @Mock
+  private StoreMarketplaceOrderService marketplaceOrderService;
 
   @Mock
   private WalletPaymentService walletPaymentService;
@@ -46,9 +48,7 @@ class StoreServiceOwnershipTest {
 
   @BeforeEach
   void setUp() {
-    storeService = new StoreService(medusaClient, mappingRepository, productOwnershipRepository, walletPaymentService);
-    when(productOwnershipRepository.findById(org.mockito.ArgumentMatchers.anyString()))
-      .thenReturn(java.util.Optional.empty());
+    storeService = new StoreService(medusaClient, mappingRepository, productOwnershipRepository, walletPaymentService, marketplaceOrderService);
   }
 
   @Test
