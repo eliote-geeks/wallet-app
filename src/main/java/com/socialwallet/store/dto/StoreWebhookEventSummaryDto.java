@@ -15,4 +15,5 @@ public class StoreWebhookEventSummaryDto {
   private String lastError;
   private Instant createdAt;
   private Instant processedAt;
+  private Instant nextRetryAt;
 }

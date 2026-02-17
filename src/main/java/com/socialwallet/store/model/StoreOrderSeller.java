@@ -69,6 +69,21 @@ public class StoreOrderSeller {
   @Column(name = "reversal_failure_reason", length = 500)
   private String reversalFailureReason;
 
+  @Column(name = "platform_fee_settled_wallet_tx_id")
+  private UUID platformFeeSettledWalletTxId;
+
+  @Column(name = "platform_fee_settled_at")
+  private Instant platformFeeSettledAt;
+
+  @Column(name = "platform_fee_reversal_wallet_tx_id")
+  private UUID platformFeeReversalWalletTxId;
+
+  @Column(name = "platform_fee_reversed_at")
+  private Instant platformFeeReversedAt;
+
+  @Column(name = "platform_fee_reversal_failure_reason", length = 500)
+  private String platformFeeReversalFailureReason;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 

@@ -15,6 +15,7 @@ import com.socialwallet.store.model.StoreProductOwnership;
 import com.socialwallet.store.repository.StoreOrderRepository;
 import com.socialwallet.store.repository.StoreOrderSellerRepository;
 import com.socialwallet.store.repository.StoreProductOwnershipRepository;
+import com.socialwallet.wallet.WalletInternalUsers;
 import com.socialwallet.wallet.application.WalletPaymentService;
 import com.socialwallet.wallet.model.WalletTransaction;
 import java.time.Instant;
@@ -323,8 +324,14 @@ public class StoreMarketplaceOrderService {
     }
 
     if (CANCEL_EVENTS.contains(event)) {
-      if (sellerOrder.getSettledWalletTxId() != null || current == StoreOrderSellerStatus.SETTLED) {
-        if (sellerOrder.getReversalWalletTxId() != null || current == StoreOrderSellerStatus.REFUNDED) {
+      boolean settledAny = sellerOrder.getSettledWalletTxId() != null
+        || sellerOrder.getPlatformFeeSettledWalletTxId() != null
+        || current == StoreOrderSellerStatus.SETTLED;
+      if (settledAny) {
+        boolean reversedAny = sellerOrder.getReversalWalletTxId() != null
+          || sellerOrder.getPlatformFeeReversalWalletTxId() != null
+          || current == StoreOrderSellerStatus.REFUNDED;
+        if (reversedAny) {
           return StoreOrderSellerStatus.REFUNDED;
         }
         return StoreOrderSellerStatus.REFUND_PENDING;
@@ -354,35 +361,58 @@ public class StoreMarketplaceOrderService {
     }
 
     for (StoreOrderSeller sellerOrder : sellers) {
-      if (sellerOrder.getSettledWalletTxId() != null || sellerOrder.getStatus() == StoreOrderSellerStatus.SETTLED) {
-        continue;
-      }
+      boolean sellerSettled = sellerOrder.getSettledWalletTxId() != null;
+      boolean platformFeeSettled = sellerOrder.getPlatformFeeSettledWalletTxId() != null;
       if (sellerOrder.getStatus() == StoreOrderSellerStatus.CANCELLED
         || sellerOrder.getStatus() == StoreOrderSellerStatus.REFUND_PENDING
         || sellerOrder.getStatus() == StoreOrderSellerStatus.REFUNDED) {
         continue;
       }
-      if (sellerOrder.getNetAmount() == null || sellerOrder.getNetAmount() <= 0) {
+
+      long net = sellerOrder.getNetAmount() == null ? 0L : Math.max(sellerOrder.getNetAmount(), 0L);
+      long fee = sellerOrder.getPlatformFeeAmount() == null ? 0L : Math.max(sellerOrder.getPlatformFeeAmount(), 0L);
+
+      if (net <= 0 && fee <= 0) {
         continue;
       }
 
-      String metadata = buildSettlementMetadata(order.getMedusaOrderId(), sellerOrder);
-      WalletTransaction tx = walletPaymentService.settleToUser(
-        sellerOrder.getSellerUserId(),
-        sellerOrder.getCurrencyCode(),
-        sellerOrder.getNetAmount(),
-        "ORDER",
-        order.getMedusaOrderId(),
-        metadata
-      );
+      if (!sellerSettled && net > 0) {
+        String metadata = buildSettlementMetadata(order.getMedusaOrderId(), sellerOrder);
+        WalletTransaction tx = walletPaymentService.settleToUser(
+          sellerOrder.getSellerUserId(),
+          sellerOrder.getCurrencyCode(),
+          net,
+          "ORDER_SELLER",
+          order.getMedusaOrderId(),
+          metadata
+        );
+        sellerOrder.setSettledWalletTxId(tx.getId());
+        sellerOrder.setSettledAt(Instant.now());
+        sellerSettled = true;
+      }
 
-      sellerOrder.setSettledWalletTxId(tx.getId());
-      sellerOrder.setSettledAt(Instant.now());
-      sellerOrder.setStatus(StoreOrderSellerStatus.SETTLED);
+      if (!platformFeeSettled && fee > 0) {
+        String metadata = buildPlatformFeeSettlementMetadata(order.getMedusaOrderId(), sellerOrder, fee);
+        WalletTransaction tx = walletPaymentService.settleToUser(
+          WalletInternalUsers.PLATFORM_TREASURY_USER_ID,
+          sellerOrder.getCurrencyCode(),
+          fee,
+          "ORDER_FEE",
+          order.getMedusaOrderId(),
+          metadata
+        );
+        sellerOrder.setPlatformFeeSettledWalletTxId(tx.getId());
+        sellerOrder.setPlatformFeeSettledAt(Instant.now());
+        platformFeeSettled = true;
+      }
+
+      if ((sellerSettled || net <= 0) && (platformFeeSettled || fee <= 0)) {
+        sellerOrder.setStatus(StoreOrderSellerStatus.SETTLED);
+      }
       orderSellerRepository.save(sellerOrder);
 
-      log.info("Marketplace settlement: orderId={}, sellerId={}, amount={}, event={}",
-        order.getMedusaOrderId(), sellerOrder.getSellerUserId(), sellerOrder.getNetAmount(), normalizedEvent);
+      log.info("Marketplace settlement: orderId={}, sellerId={}, net={}, fee={}, event={}",
+        order.getMedusaOrderId(), sellerOrder.getSellerUserId(), net, fee, normalizedEvent);
     }
   }
 
@@ -397,8 +427,10 @@ public class StoreMarketplaceOrderService {
     }
 
     for (StoreOrderSeller sellerOrder : sellers) {
-      boolean settled = sellerOrder.getSettledWalletTxId() != null || sellerOrder.getStatus() == StoreOrderSellerStatus.SETTLED;
-      if (!settled) {
+      boolean sellerSettled = sellerOrder.getSettledWalletTxId() != null;
+      boolean feeSettled = sellerOrder.getPlatformFeeSettledWalletTxId() != null;
+      boolean anySettled = sellerSettled || feeSettled || sellerOrder.getStatus() == StoreOrderSellerStatus.SETTLED;
+      if (!anySettled) {
         if (sellerOrder.getStatus() != StoreOrderSellerStatus.CANCELLED) {
           sellerOrder.setStatus(StoreOrderSellerStatus.CANCELLED);
           orderSellerRepository.save(sellerOrder);
@@ -406,55 +438,75 @@ public class StoreMarketplaceOrderService {
         continue;
       }
 
-      if (sellerOrder.getReversalWalletTxId() != null) {
-        if (sellerOrder.getStatus() != StoreOrderSellerStatus.REFUNDED) {
-          sellerOrder.setStatus(StoreOrderSellerStatus.REFUNDED);
-          orderSellerRepository.save(sellerOrder);
-        }
-        continue;
-      }
-
-      if (sellerOrder.getNetAmount() == null || sellerOrder.getNetAmount() <= 0) {
-        sellerOrder.setStatus(StoreOrderSellerStatus.REFUNDED);
-        sellerOrder.setReversedAt(Instant.now());
-        orderSellerRepository.save(sellerOrder);
-        continue;
-      }
+      long net = sellerOrder.getNetAmount() == null ? 0L : Math.max(sellerOrder.getNetAmount(), 0L);
+      long fee = sellerOrder.getPlatformFeeAmount() == null ? 0L : Math.max(sellerOrder.getPlatformFeeAmount(), 0L);
 
       sellerOrder.setStatus(StoreOrderSellerStatus.REFUND_PENDING);
       orderSellerRepository.save(sellerOrder);
 
-      try {
-        String metadata = buildRefundMetadata(order.getMedusaOrderId(), sellerOrder, normalizedEvent);
-        WalletTransaction reversal = walletPaymentService.refundFromUser(
-          sellerOrder.getSellerUserId(),
-          sellerOrder.getCurrencyCode(),
-          sellerOrder.getNetAmount(),
-          "ORDER",
-          order.getMedusaOrderId(),
-          metadata
-        );
+      if (sellerSettled && sellerOrder.getReversalWalletTxId() == null && net > 0) {
+        try {
+          String metadata = buildRefundMetadata(order.getMedusaOrderId(), sellerOrder, normalizedEvent);
+          WalletTransaction reversal = walletPaymentService.refundFromUser(
+            sellerOrder.getSellerUserId(),
+            sellerOrder.getCurrencyCode(),
+            net,
+            "ORDER_SELLER",
+            order.getMedusaOrderId(),
+            metadata
+          );
 
-        sellerOrder.setReversalWalletTxId(reversal.getId());
-        sellerOrder.setReversedAt(Instant.now());
-        sellerOrder.setReversalFailureReason(null);
-        sellerOrder.setStatus(StoreOrderSellerStatus.REFUNDED);
-        orderSellerRepository.save(sellerOrder);
-
-        log.info("Marketplace refund reversal: orderId={}, sellerId={}, amount={}, event={}",
-          order.getMedusaOrderId(), sellerOrder.getSellerUserId(), sellerOrder.getNetAmount(), normalizedEvent);
-      } catch (Exception ex) {
-        String reason = ex.getMessage();
-        if (reason != null && reason.length() > 500) {
-          reason = reason.substring(0, 500);
+          sellerOrder.setReversalWalletTxId(reversal.getId());
+          sellerOrder.setReversedAt(Instant.now());
+          sellerOrder.setReversalFailureReason(null);
+        } catch (Exception ex) {
+          String reason = ex.getMessage();
+          if (reason != null && reason.length() > 500) {
+            reason = reason.substring(0, 500);
+          }
+          sellerOrder.setReversalFailureReason(reason);
+          log.warn("Marketplace refund reversal failed: orderId={}, sellerId={}, reason={}",
+            order.getMedusaOrderId(), sellerOrder.getSellerUserId(), ex.getMessage());
         }
-        sellerOrder.setReversalFailureReason(reason);
-        sellerOrder.setStatus(StoreOrderSellerStatus.REFUND_PENDING);
-        orderSellerRepository.save(sellerOrder);
-
-        log.warn("Marketplace refund reversal failed: orderId={}, sellerId={}, reason={}",
-          order.getMedusaOrderId(), sellerOrder.getSellerUserId(), ex.getMessage());
       }
+
+      if (feeSettled && sellerOrder.getPlatformFeeReversalWalletTxId() == null && fee > 0) {
+        try {
+          String metadata = buildPlatformFeeRefundMetadata(order.getMedusaOrderId(), sellerOrder, normalizedEvent, fee);
+          WalletTransaction reversal = walletPaymentService.refundFromUser(
+            WalletInternalUsers.PLATFORM_TREASURY_USER_ID,
+            sellerOrder.getCurrencyCode(),
+            fee,
+            "ORDER_FEE",
+            order.getMedusaOrderId(),
+            metadata
+          );
+
+          sellerOrder.setPlatformFeeReversalWalletTxId(reversal.getId());
+          sellerOrder.setPlatformFeeReversedAt(Instant.now());
+          sellerOrder.setPlatformFeeReversalFailureReason(null);
+        } catch (Exception ex) {
+          String reason = ex.getMessage();
+          if (reason != null && reason.length() > 500) {
+            reason = reason.substring(0, 500);
+          }
+          sellerOrder.setPlatformFeeReversalFailureReason(reason);
+          log.warn("Marketplace platform fee reversal failed: orderId={}, sellerId={}, reason={}",
+            order.getMedusaOrderId(), sellerOrder.getSellerUserId(), ex.getMessage());
+        }
+      }
+
+      boolean sellerReversed = !sellerSettled || net <= 0 || sellerOrder.getReversalWalletTxId() != null;
+      boolean feeReversed = !feeSettled || fee <= 0 || sellerOrder.getPlatformFeeReversalWalletTxId() != null;
+      if (sellerReversed && feeReversed) {
+        sellerOrder.setStatus(StoreOrderSellerStatus.REFUNDED);
+      } else {
+        sellerOrder.setStatus(StoreOrderSellerStatus.REFUND_PENDING);
+      }
+      orderSellerRepository.save(sellerOrder);
+
+      log.info("Marketplace refund: orderId={}, sellerId={}, net={}, fee={}, status={}",
+        order.getMedusaOrderId(), sellerOrder.getSellerUserId(), net, fee, sellerOrder.getStatus());
     }
   }
 
@@ -465,6 +517,34 @@ public class StoreMarketplaceOrderService {
       root.put("sellerId", sellerOrder.getSellerUserId().toString());
       root.put("event", event);
       root.put("net", sellerOrder.getNetAmount());
+      return objectMapper.writeValueAsString(root);
+    } catch (Exception ex) {
+      return "";
+    }
+  }
+
+  private String buildPlatformFeeSettlementMetadata(String orderId, StoreOrderSeller sellerOrder, long fee) {
+    try {
+      ObjectNode root = objectMapper.createObjectNode();
+      root.put("orderId", orderId);
+      root.put("sellerId", sellerOrder.getSellerUserId().toString());
+      root.put("fee", fee);
+      return objectMapper.writeValueAsString(root);
+    } catch (Exception ex) {
+      return "";
+    }
+  }
+
+  private String buildPlatformFeeRefundMetadata(String orderId,
+                                                StoreOrderSeller sellerOrder,
+                                                String event,
+                                                long fee) {
+    try {
+      ObjectNode root = objectMapper.createObjectNode();
+      root.put("orderId", orderId);
+      root.put("sellerId", sellerOrder.getSellerUserId().toString());
+      root.put("event", event);
+      root.put("fee", fee);
       return objectMapper.writeValueAsString(root);
     } catch (Exception ex) {
       return "";

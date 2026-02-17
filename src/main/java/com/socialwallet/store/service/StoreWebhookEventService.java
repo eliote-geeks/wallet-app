@@ -3,6 +3,7 @@ package com.socialwallet.store.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.socialwallet.store.StoreException;
+import com.socialwallet.store.StoreWebhookRetryProperties;
 import com.socialwallet.store.model.StoreWebhookEvent;
 import com.socialwallet.store.model.StoreWebhookEventStatus;
 import com.socialwallet.store.repository.StoreWebhookEventRepository;
@@ -21,6 +22,7 @@ import org.springframework.util.StringUtils;
 public class StoreWebhookEventService {
   private final StoreWebhookEventRepository repository;
   private final ObjectMapper objectMapper;
+  private final StoreWebhookRetryProperties retryProperties;
 
   public StoreWebhookEvent record(String provider,
                                   String eventName,
@@ -35,16 +37,18 @@ public class StoreWebhookEventService {
     event.setHeaders(serializeHeaders(headers));
     event.setStatus(StoreWebhookEventStatus.RECEIVED);
     event.setAttempts(0);
+    event.setNextRetryAt(null);
     return repository.save(event);
   }
 
   public StoreWebhookEvent process(StoreWebhookEvent event, Runnable handler) {
-    incrementAttempts(event);
+    markProcessing(event);
     try {
       handler.run();
       event.setStatus(StoreWebhookEventStatus.PROCESSED);
       event.setProcessedAt(Instant.now());
       event.setLastError(null);
+      event.setNextRetryAt(null);
       return repository.save(event);
     } catch (RuntimeException ex) {
       String message = ex.getMessage();
@@ -53,6 +57,8 @@ public class StoreWebhookEventService {
       }
       event.setStatus(StoreWebhookEventStatus.FAILED);
       event.setLastError(message);
+      event.setProcessedAt(null);
+      event.setNextRetryAt(computeNextRetryAt(event.getAttempts()));
       repository.save(event);
       throw ex;
     }
@@ -70,9 +76,34 @@ public class StoreWebhookEventService {
     return repository.findByStatus(status, pageable);
   }
 
-  private void incrementAttempts(StoreWebhookEvent event) {
+  private void markProcessing(StoreWebhookEvent event) {
     event.setAttempts(event.getAttempts() + 1);
+    event.setStatus(StoreWebhookEventStatus.PROCESSING);
+    event.setProcessedAt(null);
+    event.setLastError(null);
+    event.setNextRetryAt(null);
     repository.save(event);
+  }
+
+  private Instant computeNextRetryAt(int attempts) {
+    int maxAttempts = Math.max(retryProperties.getMaxAttempts(), 1);
+    if (attempts >= maxAttempts) {
+      return null;
+    }
+
+    long base = Math.max(retryProperties.getBaseDelaySeconds(), 1L);
+    long max = Math.max(retryProperties.getMaxDelaySeconds(), base);
+
+    long delay = base;
+    for (int i = 1; i < attempts; i++) {
+      if (delay >= max) {
+        delay = max;
+        break;
+      }
+      delay = Math.min(max, delay * 2);
+    }
+
+    return Instant.now().plusSeconds(delay);
   }
 
   private String serializeHeaders(Map<String, String> headers) {

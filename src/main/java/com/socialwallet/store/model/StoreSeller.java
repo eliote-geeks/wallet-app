@@ -8,53 +8,41 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Data;
 
 @Entity
-@Table(name = "store_webhook_events")
+@Table(
+  name = "store_sellers",
+  uniqueConstraints = {
+    @UniqueConstraint(name = "uq_store_sellers_user", columnNames = {"user_id"})
+  }
+)
 @Data
-public class StoreWebhookEvent {
+public class StoreSeller {
   @Id
   private UUID id;
 
-  @Column(name = "provider", nullable = false, length = 50)
-  private String provider;
+  @Column(name = "user_id", nullable = false)
+  private UUID userId;
 
-  @Column(name = "event_name", length = 255)
-  private String eventName;
+  @Column(name = "shop_name", nullable = false, length = 120)
+  private String shopName;
 
-  @Column(name = "signature", length = 255)
-  private String signature;
-
-  @Column(name = "payload", columnDefinition = "TEXT")
-  private String payload;
-
-  @Column(name = "headers", columnDefinition = "TEXT")
-  private String headers;
+  @Column(name = "description", length = 500)
+  private String description;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 20)
-  private StoreWebhookEventStatus status;
-
-  @Column(name = "attempts", nullable = false)
-  private int attempts;
-
-  @Column(name = "last_error", columnDefinition = "TEXT")
-  private String lastError;
+  private StoreSellerStatus status = StoreSellerStatus.ACTIVE;
 
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
-
-  @Column(name = "processed_at")
-  private Instant processedAt;
-
-  @Column(name = "next_retry_at")
-  private Instant nextRetryAt;
 
   @PrePersist
   protected void onCreate() {
@@ -71,3 +59,4 @@ public class StoreWebhookEvent {
     updatedAt = Instant.now();
   }
 }
+

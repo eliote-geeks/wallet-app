@@ -79,6 +79,15 @@ app:
       publishable-key: ${MEDUSA_PUBLISHABLE_KEY:}
       admin-token: ${MEDUSA_ADMIN_TOKEN:}
       webhook-secret: ${MEDUSA_WEBHOOK_SECRET:}
+    webhooks:
+      medusa:
+        retry:
+          enabled: ${STORE_WEBHOOK_RETRY_ENABLED:true}
+          fixed-delay-ms: ${STORE_WEBHOOK_RETRY_FIXED_DELAY_MS:5000}
+          batch-size: ${STORE_WEBHOOK_RETRY_BATCH_SIZE:20}
+          max-attempts: ${STORE_WEBHOOK_RETRY_MAX_ATTEMPTS:10}
+          base-delay-seconds: ${STORE_WEBHOOK_RETRY_BASE_DELAY_SECONDS:5}
+          max-delay-seconds: ${STORE_WEBHOOK_RETRY_MAX_DELAY_SECONDS:300}
     settlement:
       platform-fee-bps: ${STORE_PLATFORM_FEE_BPS:0}
 

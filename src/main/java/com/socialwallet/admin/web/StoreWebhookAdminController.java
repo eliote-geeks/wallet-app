@@ -62,6 +62,7 @@ public class StoreWebhookAdminController {
     dto.setLastError(event.getLastError());
     dto.setCreatedAt(event.getCreatedAt());
     dto.setProcessedAt(event.getProcessedAt());
+    dto.setNextRetryAt(event.getNextRetryAt());
     return dto;
   }
 
@@ -75,6 +76,7 @@ public class StoreWebhookAdminController {
     dto.setLastError(event.getLastError());
     dto.setCreatedAt(event.getCreatedAt());
     dto.setProcessedAt(event.getProcessedAt());
+    dto.setNextRetryAt(event.getNextRetryAt());
     dto.setPayload(event.getPayload());
     dto.setHeaders(event.getHeaders());
     dto.setSignature(event.getSignature());

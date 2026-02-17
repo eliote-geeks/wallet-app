@@ -2,6 +2,7 @@ package com.socialwallet.wallet.application;
 
 import com.socialwallet.identity.repository.UserAccountRepository;
 import com.socialwallet.wallet.WalletException;
+import com.socialwallet.wallet.WalletInternalUsers;
 import com.socialwallet.wallet.dto.WalletBalanceDto;
 import com.socialwallet.wallet.dto.WalletTransferResponse;
 import com.socialwallet.wallet.dto.WalletTransactionDto;
@@ -25,6 +26,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +41,6 @@ public class WalletPaymentService {
   private final WalletTransactionRepository transactionRepository;
   private final WalletEntryRepository entryRepository;
   private final UserAccountRepository userAccountRepository;
-  private static final UUID SYSTEM_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000000");
 
   @Transactional
   public WalletHold authorize(UUID userId, String cartId, String currency, Long amount) {
@@ -97,7 +98,7 @@ public class WalletPaymentService {
 
     WalletAccount account = accountRepository.findForUpdateById(hold.getAccountId())
       .orElseThrow(() -> new WalletException(HttpStatus.NOT_FOUND, "Wallet account not found"));
-    WalletAccount systemAccount = getOrCreateAccount(SYSTEM_USER_ID, hold.getCurrencyCode());
+    WalletAccount systemAccount = getOrCreateAccount(WalletInternalUsers.SYSTEM_USER_ID, hold.getCurrencyCode());
     Long amount = hold.getAmount();
 
     hold.setStatus(WalletHoldStatus.CAPTURED);
@@ -177,7 +178,7 @@ public class WalletPaymentService {
     }
 
     WalletAccount account = getOrCreateAccount(tx.getUserId(), tx.getCurrencyCode());
-    WalletAccount systemAccount = getOrCreateAccount(SYSTEM_USER_ID, tx.getCurrencyCode());
+    WalletAccount systemAccount = getOrCreateAccount(WalletInternalUsers.SYSTEM_USER_ID, tx.getCurrencyCode());
 
     recordEntry(tx, systemAccount, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.DEBIT, tx.getAmount(), "Topup funding");
     recordEntry(tx, account, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.CREDIT, tx.getAmount(), "Topup");
@@ -239,7 +240,7 @@ public class WalletPaymentService {
     if (availableBalance < tx.getAmount()) {
       throw new WalletException(HttpStatus.BAD_REQUEST, "Insufficient wallet balance");
     }
-    WalletAccount systemAccount = getOrCreateAccount(SYSTEM_USER_ID, tx.getCurrencyCode());
+    WalletAccount systemAccount = getOrCreateAccount(WalletInternalUsers.SYSTEM_USER_ID, tx.getCurrencyCode());
 
     recordEntry(tx, account, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.DEBIT, tx.getAmount(), "Withdraw");
     recordEntry(tx, systemAccount, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.CREDIT, tx.getAmount(), "Withdraw");
@@ -336,17 +337,32 @@ public class WalletPaymentService {
     }
 
     String normalizedCurrency = normalizeCurrency(currency);
+
+    // Idempotence for settlement under concurrency.
+    WalletTransaction existingSettlement = transactionRepository.findByUserIdAndTypeAndReferenceTypeAndReferenceId(
+      userId, WalletTransactionType.SETTLEMENT, referenceType, referenceId
+    ).orElse(null);
+    if (existingSettlement != null && existingSettlement.getStatus() == WalletTransactionStatus.COMPLETED) {
+      return existingSettlement;
+    }
+
     WalletAccount beneficiary = getOrCreateAccount(userId, normalizedCurrency);
-    WalletAccount systemAccount = getOrCreateAccount(SYSTEM_USER_ID, normalizedCurrency);
+    WalletAccount systemAccount = getOrCreateAccount(WalletInternalUsers.SYSTEM_USER_ID, normalizedCurrency);
 
-    WalletTransaction tx = recordTransaction(userId, WalletTransactionType.SETTLEMENT, WalletTransactionStatus.COMPLETED,
-      normalizedCurrency, amount, referenceType, referenceId, metadata);
-    recordEntry(tx, systemAccount, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.DEBIT, amount, "Settlement");
-    recordEntry(tx, beneficiary, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.CREDIT, amount, "Settlement");
+    try {
+      WalletTransaction tx = recordTransaction(userId, WalletTransactionType.SETTLEMENT, WalletTransactionStatus.COMPLETED,
+        normalizedCurrency, amount, referenceType, referenceId, metadata);
+      recordEntry(tx, systemAccount, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.DEBIT, amount, "Settlement");
+      recordEntry(tx, beneficiary, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.CREDIT, amount, "Settlement");
 
-    log.info("Wallet settlement: userId={}, amount={}, currency={}, referenceType={}, referenceId={}",
-      userId, amount, normalizedCurrency, referenceType, referenceId);
-    return tx;
+      log.info("Wallet settlement: userId={}, amount={}, currency={}, referenceType={}, referenceId={}",
+        userId, amount, normalizedCurrency, referenceType, referenceId);
+      return tx;
+    } catch (DataIntegrityViolationException ex) {
+      return transactionRepository.findByUserIdAndTypeAndReferenceTypeAndReferenceId(
+          userId, WalletTransactionType.SETTLEMENT, referenceType, referenceId)
+        .orElseThrow(() -> new WalletException(HttpStatus.CONFLICT, "Settlement already exists"));
+    }
   }
 
   @Transactional
@@ -370,22 +386,37 @@ public class WalletPaymentService {
     }
 
     String normalizedCurrency = normalizeCurrency(currency);
+
+    // Idempotence for refund reversal under concurrency.
+    WalletTransaction existingRefund = transactionRepository.findByUserIdAndTypeAndReferenceTypeAndReferenceId(
+      userId, WalletTransactionType.REFUND, referenceType, referenceId
+    ).orElse(null);
+    if (existingRefund != null && existingRefund.getStatus() == WalletTransactionStatus.COMPLETED) {
+      return existingRefund;
+    }
+
     WalletAccount payer = getOrCreateAccount(userId, normalizedCurrency);
-    WalletAccount systemAccount = getOrCreateAccount(SYSTEM_USER_ID, normalizedCurrency);
+    WalletAccount systemAccount = getOrCreateAccount(WalletInternalUsers.SYSTEM_USER_ID, normalizedCurrency);
 
     long available = balanceFor(payer, WalletEntryBalanceType.AVAILABLE);
     if (available < amount) {
       throw new WalletException(HttpStatus.BAD_REQUEST, "Insufficient wallet balance for refund");
     }
 
-    WalletTransaction tx = recordTransaction(userId, WalletTransactionType.REFUND, WalletTransactionStatus.COMPLETED,
-      normalizedCurrency, amount, referenceType, referenceId, metadata);
-    recordEntry(tx, payer, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.DEBIT, amount, "Refund reversal");
-    recordEntry(tx, systemAccount, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.CREDIT, amount, "Refund reversal");
+    try {
+      WalletTransaction tx = recordTransaction(userId, WalletTransactionType.REFUND, WalletTransactionStatus.COMPLETED,
+        normalizedCurrency, amount, referenceType, referenceId, metadata);
+      recordEntry(tx, payer, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.DEBIT, amount, "Refund reversal");
+      recordEntry(tx, systemAccount, WalletEntryBalanceType.AVAILABLE, WalletEntryDirection.CREDIT, amount, "Refund reversal");
 
-    log.info("Wallet refund reversal: userId={}, amount={}, currency={}, referenceType={}, referenceId={}",
-      userId, amount, normalizedCurrency, referenceType, referenceId);
-    return tx;
+      log.info("Wallet refund reversal: userId={}, amount={}, currency={}, referenceType={}, referenceId={}",
+        userId, amount, normalizedCurrency, referenceType, referenceId);
+      return tx;
+    } catch (DataIntegrityViolationException ex) {
+      return transactionRepository.findByUserIdAndTypeAndReferenceTypeAndReferenceId(
+          userId, WalletTransactionType.REFUND, referenceType, referenceId)
+        .orElseThrow(() -> new WalletException(HttpStatus.CONFLICT, "Refund reversal already exists"));
+    }
   }
 
 
