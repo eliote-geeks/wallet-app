@@ -31,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -236,9 +237,9 @@ public class StoreMarketplaceOrderService {
 
   private StoreOrder upsertOrder(JsonNode orderNode) {
     String medusaOrderId = textAt(orderNode, "id");
-    StoreOrder order = orderRepository.findByMedusaOrderId(medusaOrderId).orElse(null);
-    if (order == null) {
-      order = new StoreOrder();
+    StoreOrder existing = orderRepository.findByMedusaOrderId(medusaOrderId).orElse(null);
+    StoreOrder order = existing != null ? existing : new StoreOrder();
+    if (existing == null) {
       order.setMedusaOrderId(medusaOrderId);
     }
 
@@ -261,7 +262,22 @@ public class StoreMarketplaceOrderService {
     order.setPaymentStatus(textAt(orderNode, "payment_status"));
     order.setFulfillmentStatus(textAt(orderNode, "fulfillment_status"));
 
-    return orderRepository.save(order);
+    try {
+      return orderRepository.save(order);
+    } catch (DataIntegrityViolationException ex) {
+      // Concurrent webhook + synthetic settlement can race on unique medusa_order_id.
+      // In this case, reload and update existing row instead of failing the flow.
+      StoreOrder concurrent = orderRepository.findByMedusaOrderId(medusaOrderId).orElseThrow(() ->
+        new StoreException(HttpStatus.CONFLICT, "Order upsert conflict for medusa order " + medusaOrderId));
+      concurrent.setCartId(order.getCartId());
+      concurrent.setBuyerUserId(order.getBuyerUserId());
+      concurrent.setCurrencyCode(order.getCurrencyCode());
+      concurrent.setTotalAmount(order.getTotalAmount());
+      concurrent.setOrderStatus(order.getOrderStatus());
+      concurrent.setPaymentStatus(order.getPaymentStatus());
+      concurrent.setFulfillmentStatus(order.getFulfillmentStatus());
+      return orderRepository.save(concurrent);
+    }
   }
 
   private void upsertSellerOrders(StoreOrder order,

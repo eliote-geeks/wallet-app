@@ -7,6 +7,7 @@ import com.socialwallet.store.model.StoreOrderSellerStatus;
 import com.socialwallet.store.service.StoreMarketplaceOrderService;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -55,13 +56,13 @@ public class StoreSellerOrderController {
                                                     @RequestParam(name = "sellerId", required = false) String sellerId) {
     UUID targetSellerId = resolveTargetSeller(jwt, sellerId);
     StoreSellerOrderDetailDto dto = marketplaceOrderService.getSellerOrderDetail(targetSellerId, orderId);
-    return ResponseEntity.ok(Map.of(
-      "orderId", orderId,
-      "status", dto.getStatus(),
-      "orderStatus", dto.getOrderStatus(),
-      "paymentStatus", dto.getPaymentStatus(),
-      "fulfillmentStatus", dto.getFulfillmentStatus()
-    ));
+    Map<String, Object> response = new LinkedHashMap<>();
+    response.put("orderId", orderId);
+    response.put("status", dto.getStatus());
+    response.put("orderStatus", dto.getOrderStatus());
+    response.put("paymentStatus", dto.getPaymentStatus());
+    response.put("fulfillmentStatus", dto.getFulfillmentStatus());
+    return ResponseEntity.ok(response);
   }
 
   private UUID resolveTargetSeller(Jwt jwt, String sellerIdParam) {

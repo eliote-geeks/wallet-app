@@ -220,6 +220,34 @@ Le JWK set est lu sur:
 - `POST /api/payments/mobile-money/withdrawals` (JWT requis) payload: `{ "amount": 5000, "currency": "XAF", "phoneNumber": "+237...", "provider": "mtn" }`
 - `POST /api/webhooks/mobile-money` (public) payload: `{ "transactionId": "<uuid>", "type": "TOPUP|WITHDRAW", "status": "SUCCESS|FAILED" }`
 
+## Webhook Medusa (secret)
+- Signature HMAC SHA256 supportee:
+  - backend: `MEDUSA_WEBHOOK_SECRET`
+  - Medusa subscriber: `KOBO_BACKEND_WEBHOOK_SECRET`
+- Script de configuration/restart:
+
+```bash
+./scripts/configure-medusa-webhook-secret.sh
+```
+
+- Secret explicite + sans restart:
+
+```bash
+NO_RESTART=true ./scripts/configure-medusa-webhook-secret.sh "my-shared-secret"
+```
+
+## E2E scripts (dev)
+- Pre-requis:
+  - stack API/Keycloak/Medusa active
+  - `MEDUSA_ADMIN_TOKEN` configure dans `.env` backend
+- Scenarios:
+  - `./scripts/e2e-mobilemoney.sh` -> topup mobile money (PENDING -> webhook SUCCESS) + verification de solde.
+  - `./scripts/e2e-store-wallet-refund.sh` -> creation produit vendeur, checkout wallet, settlement vendeur, webhook refund + reversal wallet.
+- Variables utiles:
+  - `API_BASE` (defaut `http://localhost:8080`)
+  - `BUYER_PHONE`, `SELLER_PHONE`
+  - `TOPUP_AMOUNT`, `ITEM_AMOUNT`, `CURRENCY`
+
 ## i18n (FR par defaut)
 - Langues supportees: `fr`, `en`
 - Selection via header `Accept-Language` (ex: `fr`, `en`)
