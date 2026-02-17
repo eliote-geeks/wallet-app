@@ -111,6 +111,15 @@ public class StoreService {
     return medusaClient.postStore("/store/carts/" + cartId + "/shipping-methods", payload);
   }
 
+  public JsonNode listShippingOptions(String cartId) {
+    if (!StringUtils.hasText(cartId)) {
+      throw new StoreException(HttpStatus.BAD_REQUEST, "cartId is required");
+    }
+    LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+    params.add("cart_id", cartId);
+    return medusaClient.getStore("/store/shipping-options", params);
+  }
+
   public JsonNode completeCart(UUID userId, String cartId, String paymentMethod) {
     if ("wallet".equalsIgnoreCase(paymentMethod)) {
       return completeCartWithWallet(userId, cartId);
@@ -179,7 +188,10 @@ public class StoreService {
     }
     try {
       MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-      params.add("fields", "*items,*items.product,*items.product.metadata,*items.variant,*items.variant.product,*items.variant.product.metadata,payment_status,currency_code");
+      // We need enough fields for settlement + order/buyer mapping (metadata.kobo_user_id).
+      params.add("fields", "id,cart_id,currency_code,total,status,payment_status,fulfillment_status,metadata,"
+        + "*items,*items.product,*items.product.metadata,*items.variant,*items.variant.product,*items.variant.product.metadata,"
+        + "*customer,*customer.metadata");
       JsonNode adminOrder = medusaClient.getAdmin("/admin/orders/" + orderId, params);
       marketplaceOrderService.handleMedusaWebhook("payment.captured", adminOrder.toString());
     } catch (Exception ex) {

@@ -69,6 +69,11 @@ public class StoreController {
     return ResponseEntity.ok(storeService.getCart(cartId));
   }
 
+  @GetMapping("/carts/{cartId}/shipping-options")
+  public ResponseEntity<JsonNode> listShippingOptions(@PathVariable String cartId) {
+    return ResponseEntity.ok(storeService.listShippingOptions(cartId));
+  }
+
   @PostMapping("/carts/{cartId}/line-items")
   public ResponseEntity<JsonNode> addLineItem(@PathVariable String cartId,
                                               @RequestBody Map<String, Object> payload) {
