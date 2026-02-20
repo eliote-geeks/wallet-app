@@ -39,6 +39,16 @@ Services exposes:
 - Keycloak: http://localhost:8082
 - Postgres: localhost:5432
 
+## Deploiement Kubernetes + GitHub Actions
+- Guide complet: `docs/deployment/k8s-github-actions.md`
+- Workflows CI/CD:
+  - `.github/workflows/backend-ci.yml`
+  - `.github/workflows/backend-cd.yml`
+- Manifests K8s:
+  - `infra/k8s/backend/base`
+  - `infra/k8s/backend/overlays/dev`
+  - `infra/k8s/backend/overlays/prod`
+
 ## Redemarage rapide (dev)
 
 Pour eviter un `docker compose up --build` (lent), utilise les scripts:

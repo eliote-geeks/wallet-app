@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: social-wallet-backend
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: social-wallet-backend
+          image: ghcr.io/eliote-geeks/wallet-app-backend:dev-latest
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1536Mi
+
