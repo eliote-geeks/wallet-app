@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: social-wallet-backend
+spec:
+  rules:
+    - host: api-dev.kobo.your-domain.tld
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: social-wallet-backend
+                port:
+                  number: 80
+

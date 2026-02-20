@@ -1,0 +1,194 @@
+name: backend-cd
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Environment to deploy (dev|prod)"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - prod
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_repo: ${{ steps.meta.outputs.image_repo }}
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+      image_ref: ${{ steps.meta.outputs.image_ref }}
+      target_env: ${{ steps.meta.outputs.target_env }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve deployment metadata
+        id: meta
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            TARGET_ENV="${{ inputs.target_env }}"
+          elif [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            TARGET_ENV="prod"
+          else
+            TARGET_ENV="dev"
+          fi
+          IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER}/wallet-app-backend"
+          IMAGE_TAG="${GITHUB_SHA::7}"
+          echo "target_env=${TARGET_ENV}" >> "$GITHUB_OUTPUT"
+          echo "image_repo=${IMAGE_REPO}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "image_ref=${IMAGE_REPO}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_ref }}
+            ${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.target_env }}-latest
+
+  deploy-dev:
+    if: ${{ needs.build-and-push.outputs.target_env == 'dev' }}
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.30.0
+
+      - name: Configure kubeconfig
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          if echo "$KUBE_CONFIG" | grep -q "apiVersion:"; then
+            printf "%s" "$KUBE_CONFIG" > "$HOME/.kube/config"
+          else
+            printf "%s" "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
+          fi
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Ensure namespace and secrets
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          KEYCLOAK_ISSUER_URI: ${{ secrets.KEYCLOAK_ISSUER_URI }}
+          KEYCLOAK_JWK_SET_URI: ${{ secrets.KEYCLOAK_JWK_SET_URI }}
+          MEDUSA_BASE_URL: ${{ secrets.MEDUSA_BASE_URL }}
+          MEDUSA_PUBLISHABLE_KEY: ${{ secrets.MEDUSA_PUBLISHABLE_KEY }}
+          MEDUSA_ADMIN_TOKEN: ${{ secrets.MEDUSA_ADMIN_TOKEN }}
+          MEDUSA_WEBHOOK_SECRET: ${{ secrets.MEDUSA_WEBHOOK_SECRET }}
+          STORE_PLATFORM_FEE_BPS: ${{ secrets.STORE_PLATFORM_FEE_BPS }}
+        run: |
+          kubectl create namespace kobo-dev --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n kobo-dev create secret generic social-wallet-backend-secrets \
+            --from-literal=DB_URL="${DB_URL}" \
+            --from-literal=DB_USER="${DB_USER}" \
+            --from-literal=DB_PASSWORD="${DB_PASSWORD}" \
+            --from-literal=KEYCLOAK_ISSUER_URI="${KEYCLOAK_ISSUER_URI}" \
+            --from-literal=KEYCLOAK_JWK_SET_URI="${KEYCLOAK_JWK_SET_URI}" \
+            --from-literal=MEDUSA_BASE_URL="${MEDUSA_BASE_URL}" \
+            --from-literal=MEDUSA_PUBLISHABLE_KEY="${MEDUSA_PUBLISHABLE_KEY}" \
+            --from-literal=MEDUSA_ADMIN_TOKEN="${MEDUSA_ADMIN_TOKEN}" \
+            --from-literal=MEDUSA_WEBHOOK_SECRET="${MEDUSA_WEBHOOK_SECRET}" \
+            --from-literal=STORE_PLATFORM_FEE_BPS="${STORE_PLATFORM_FEE_BPS}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply manifests and update image
+        run: |
+          kubectl apply -k infra/k8s/backend/overlays/dev
+          kubectl -n kobo-dev set image deployment/social-wallet-backend \
+            social-wallet-backend=${{ needs.build-and-push.outputs.image_ref }}
+          kubectl -n kobo-dev rollout status deployment/social-wallet-backend --timeout=180s
+
+  deploy-prod:
+    if: ${{ needs.build-and-push.outputs.target_env == 'prod' }}
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.30.0
+
+      - name: Configure kubeconfig
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          if echo "$KUBE_CONFIG" | grep -q "apiVersion:"; then
+            printf "%s" "$KUBE_CONFIG" > "$HOME/.kube/config"
+          else
+            printf "%s" "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
+          fi
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Ensure namespace and secrets
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          KEYCLOAK_ISSUER_URI: ${{ secrets.KEYCLOAK_ISSUER_URI }}
+          KEYCLOAK_JWK_SET_URI: ${{ secrets.KEYCLOAK_JWK_SET_URI }}
+          MEDUSA_BASE_URL: ${{ secrets.MEDUSA_BASE_URL }}
+          MEDUSA_PUBLISHABLE_KEY: ${{ secrets.MEDUSA_PUBLISHABLE_KEY }}
+          MEDUSA_ADMIN_TOKEN: ${{ secrets.MEDUSA_ADMIN_TOKEN }}
+          MEDUSA_WEBHOOK_SECRET: ${{ secrets.MEDUSA_WEBHOOK_SECRET }}
+          STORE_PLATFORM_FEE_BPS: ${{ secrets.STORE_PLATFORM_FEE_BPS }}
+        run: |
+          kubectl create namespace kobo-prod --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n kobo-prod create secret generic social-wallet-backend-secrets \
+            --from-literal=DB_URL="${DB_URL}" \
+            --from-literal=DB_USER="${DB_USER}" \
+            --from-literal=DB_PASSWORD="${DB_PASSWORD}" \
+            --from-literal=KEYCLOAK_ISSUER_URI="${KEYCLOAK_ISSUER_URI}" \
+            --from-literal=KEYCLOAK_JWK_SET_URI="${KEYCLOAK_JWK_SET_URI}" \
+            --from-literal=MEDUSA_BASE_URL="${MEDUSA_BASE_URL}" \
+            --from-literal=MEDUSA_PUBLISHABLE_KEY="${MEDUSA_PUBLISHABLE_KEY}" \
+            --from-literal=MEDUSA_ADMIN_TOKEN="${MEDUSA_ADMIN_TOKEN}" \
+            --from-literal=MEDUSA_WEBHOOK_SECRET="${MEDUSA_WEBHOOK_SECRET}" \
+            --from-literal=STORE_PLATFORM_FEE_BPS="${STORE_PLATFORM_FEE_BPS}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply manifests and update image
+        run: |
+          kubectl apply -k infra/k8s/backend/overlays/prod
+          kubectl -n kobo-prod set image deployment/social-wallet-backend \
+            social-wallet-backend=${{ needs.build-and-push.outputs.image_ref }}
+          kubectl -n kobo-prod rollout status deployment/social-wallet-backend --timeout=180s
+
