@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: social-wallet-postgres
+  labels:
+    app.kubernetes.io/name: social-wallet-postgres
+spec:
+  serviceName: social-wallet-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: social-wallet-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: social-wallet-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: social-wallet-platform-secrets
+                  key: POSTGRES_SUPERUSER_PASSWORD
+            - name: POSTGRES_DB
+              value: postgres
+            - name: POSTGRES_APP_DB
+              value: social_wallet
+            - name: POSTGRES_APP_USER
+              value: social_wallet
+            - name: POSTGRES_APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: social-wallet-platform-secrets
+                  key: POSTGRES_APP_PASSWORD
+            - name: POSTGRES_KEYCLOAK_DB
+              value: keycloak
+            - name: POSTGRES_KEYCLOAK_USER
+              value: keycloak
+            - name: POSTGRES_KEYCLOAK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: social-wallet-platform-secrets
+                  key: POSTGRES_KEYCLOAK_PASSWORD
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U postgres -d postgres
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U postgres -d postgres
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 300m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: backups
+              mountPath: /backups
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d/init-dbs.sh
+              subPath: init-dbs.sh
+      volumes:
+        - name: backups
+          persistentVolumeClaim:
+            claimName: social-wallet-postgres-backups
+        - name: postgres-init
+          configMap:
+            name: social-wallet-postgres-init
+            defaultMode: 0555
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 30Gi

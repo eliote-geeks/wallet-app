@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - postgres-service.yaml
+  - postgres-statefulset.yaml
+  - postgres-pdb.yaml
+  - postgres-backup-pvc.yaml
+  - postgres-backup-cronjob.yaml
+  - keycloak-service.yaml
+  - keycloak-deployment.yaml
+  - keycloak-pdb.yaml
+  - keycloak-hpa.yaml
+  - networkpolicy-default-deny-ingress.yaml
+  - networkpolicy-allow-traefik-to-public.yaml
+  - networkpolicy-allow-backend-to-keycloak.yaml
+  - networkpolicy-allow-backend-keycloak-to-postgres.yaml
+
+configMapGenerator:
+  - name: social-wallet-postgres-init
+    files:
+      - init-dbs.sh=postgres-init.sh
+  - name: social-wallet-keycloak-realm
+    files:
+      - social-wallet-realm.json=keycloak-realm-social-wallet.json
+  - name: social-wallet-postgres-backup-script
+    files:
+      - postgres-backup.sh=postgres-backup.sh
+
+generatorOptions:
+  disableNameSuffixHash: true

@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apm-server
+  labels:
+    app.kubernetes.io/name: apm-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: apm-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: apm-server
+    spec:
+      containers:
+        - name: apm-server
+          image: docker.elastic.co/apm/apm-server:8.13.4
+          imagePullPolicy: IfNotPresent
+          args:
+            - -e
+            - -c
+            - /usr/share/apm-server/apm-server.yml
+            - -E
+            - strict.perms=false
+          env:
+            - name: ELASTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: elastic-credentials
+                  key: ELASTIC_PASSWORD
+            - name: APM_SECRET_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: elastic-credentials
+                  key: APM_SECRET_TOKEN
+          ports:
+            - containerPort: 8200
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8200
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8200
+            initialDelaySeconds: 40
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: config
+              mountPath: /usr/share/apm-server/apm-server.yml
+              subPath: apm-server.yml
+      volumes:
+        - name: config
+          configMap:
+            name: apm-server-config

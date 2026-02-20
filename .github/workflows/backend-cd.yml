@@ -80,72 +80,131 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check deployment preconditions
-        id: preflight
-        env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-        run: |
-          if [[ -z "${KUBE_CONFIG}" ]]; then
-            echo "KUBE_CONFIG secret is missing, skipping deploy."
-            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Set up kubectl
-        if: steps.preflight.outputs.should_deploy == 'true'
         uses: azure/setup-kubectl@v4
         with:
           version: v1.30.0
 
-      - name: Configure kubeconfig
-        if: steps.preflight.outputs.should_deploy == 'true'
+      - name: Configure SSH
         env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          mkdir -p "$HOME/.kube"
-          if echo "$KUBE_CONFIG" | grep -q "apiVersion:"; then
-            printf "%s" "$KUBE_CONFIG" > "$HOME/.kube/config"
-          else
-            printf "%s" "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
+          if [[ -z "${DEPLOY_SSH_KEY}" || -z "${DEPLOY_HOST}" ]]; then
+            echo "DEPLOY_SSH_KEY or DEPLOY_HOST missing"
+            exit 1
           fi
-          chmod 600 "$HOME/.kube/config"
+          mkdir -p "$HOME/.ssh"
+          printf "%s" "${DEPLOY_SSH_KEY}" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -H "${DEPLOY_HOST}" >> "$HOME/.ssh/known_hosts"
 
-      - name: Ensure namespace and secrets
-        if: steps.preflight.outputs.should_deploy == 'true'
+      - name: Prepare and apply namespaces + secrets
         env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DB_URL: ${{ secrets.DB_URL }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_SUPERUSER_PASSWORD: ${{ secrets.POSTGRES_SUPERUSER_PASSWORD }}
+          POSTGRES_APP_PASSWORD: ${{ secrets.POSTGRES_APP_PASSWORD }}
+          POSTGRES_KEYCLOAK_PASSWORD: ${{ secrets.POSTGRES_KEYCLOAK_PASSWORD }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+          BACKUP_RETENTION_DAYS: ${{ secrets.BACKUP_RETENTION_DAYS }}
           KEYCLOAK_ISSUER_URI: ${{ secrets.KEYCLOAK_ISSUER_URI }}
           KEYCLOAK_JWK_SET_URI: ${{ secrets.KEYCLOAK_JWK_SET_URI }}
+          KEYCLOAK_ISSUER_EXTERNAL: ${{ secrets.KEYCLOAK_ISSUER_EXTERNAL }}
+          KEYCLOAK_ISSUER_INTERNAL: ${{ secrets.KEYCLOAK_ISSUER_INTERNAL }}
+          KEYCLOAK_URL: ${{ secrets.KEYCLOAK_URL }}
+          KEYCLOAK_REALM: ${{ secrets.KEYCLOAK_REALM }}
+          KEYCLOAK_ADMIN_REALM: ${{ secrets.KEYCLOAK_ADMIN_REALM }}
+          KEYCLOAK_ADMIN_CLIENT_ID: ${{ secrets.KEYCLOAK_ADMIN_CLIENT_ID }}
+          KEYCLOAK_ADMIN_USERNAME: ${{ secrets.KEYCLOAK_ADMIN_USERNAME }}
+          KEYCLOAK_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
+          KEYCLOAK_CLIENT_ID: ${{ secrets.KEYCLOAK_CLIENT_ID }}
+          KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
           MEDUSA_BASE_URL: ${{ secrets.MEDUSA_BASE_URL }}
           MEDUSA_PUBLISHABLE_KEY: ${{ secrets.MEDUSA_PUBLISHABLE_KEY }}
           MEDUSA_ADMIN_TOKEN: ${{ secrets.MEDUSA_ADMIN_TOKEN }}
           MEDUSA_WEBHOOK_SECRET: ${{ secrets.MEDUSA_WEBHOOK_SECRET }}
           STORE_PLATFORM_FEE_BPS: ${{ secrets.STORE_PLATFORM_FEE_BPS }}
+          ELASTIC_PASSWORD: ${{ secrets.ELASTIC_PASSWORD }}
+          KIBANA_ENCRYPTION_KEY: ${{ secrets.KIBANA_ENCRYPTION_KEY }}
+          APM_SECRET_TOKEN: ${{ secrets.APM_SECRET_TOKEN }}
         run: |
-          kubectl create namespace kobo-dev --dry-run=client -o yaml | kubectl apply -f -
+          : "${DEPLOY_USER:=ubuntu}"
+          : "${DB_URL:=jdbc:postgresql://social-wallet-postgres:5432/social_wallet}"
+          : "${DB_USER:=social_wallet}"
+          : "${KEYCLOAK_ISSUER_URI:=http://social-wallet-keycloak:8080/realms/social-wallet}"
+          : "${KEYCLOAK_JWK_SET_URI:=http://social-wallet-keycloak:8080/realms/social-wallet/protocol/openid-connect/certs}"
+          : "${KEYCLOAK_ISSUER_EXTERNAL:=https://api-dev.kobo.79.137.32.27.nip.io/realms/social-wallet}"
+          : "${KEYCLOAK_ISSUER_INTERNAL:=http://social-wallet-keycloak:8080/realms/social-wallet}"
+          : "${KEYCLOAK_URL:=http://social-wallet-keycloak:8080}"
+          : "${KEYCLOAK_REALM:=social-wallet}"
+          : "${KEYCLOAK_ADMIN_REALM:=master}"
+          : "${KEYCLOAK_ADMIN_CLIENT_ID:=admin-cli}"
+          : "${KEYCLOAK_CLIENT_ID:=social-wallet-api}"
+          : "${BACKUP_RETENTION_DAYS:=14}"
+
+          for required in DB_PASSWORD POSTGRES_SUPERUSER_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_KEYCLOAK_PASSWORD BACKUP_ENCRYPTION_KEY KEYCLOAK_ADMIN_USERNAME KEYCLOAK_ADMIN_PASSWORD ELASTIC_PASSWORD KIBANA_ENCRYPTION_KEY APM_SECRET_TOKEN DEPLOY_HOST; do
+            if [[ -z "${!required}" ]]; then
+              echo "Missing required secret: ${required}"
+              exit 1
+            fi
+          done
+
+          kubectl create namespace kobo-dev --dry-run=client -o yaml | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+          kubectl create namespace observability --dry-run=client -o yaml | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+
+          kubectl -n kobo-dev create secret generic social-wallet-platform-secrets \
+            --from-literal=POSTGRES_SUPERUSER_PASSWORD="${POSTGRES_SUPERUSER_PASSWORD}" \
+            --from-literal=POSTGRES_APP_PASSWORD="${POSTGRES_APP_PASSWORD}" \
+            --from-literal=POSTGRES_KEYCLOAK_PASSWORD="${POSTGRES_KEYCLOAK_PASSWORD}" \
+            --from-literal=BACKUP_ENCRYPTION_KEY="${BACKUP_ENCRYPTION_KEY}" \
+            --from-literal=BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS}" \
+            --from-literal=KEYCLOAK_ADMIN_USERNAME="${KEYCLOAK_ADMIN_USERNAME}" \
+            --from-literal=KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD}" \
+            --dry-run=client -o yaml | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+
           kubectl -n kobo-dev create secret generic social-wallet-backend-secrets \
             --from-literal=DB_URL="${DB_URL}" \
             --from-literal=DB_USER="${DB_USER}" \
             --from-literal=DB_PASSWORD="${DB_PASSWORD}" \
             --from-literal=KEYCLOAK_ISSUER_URI="${KEYCLOAK_ISSUER_URI}" \
             --from-literal=KEYCLOAK_JWK_SET_URI="${KEYCLOAK_JWK_SET_URI}" \
+            --from-literal=KEYCLOAK_ISSUER_EXTERNAL="${KEYCLOAK_ISSUER_EXTERNAL}" \
+            --from-literal=KEYCLOAK_ISSUER_INTERNAL="${KEYCLOAK_ISSUER_INTERNAL}" \
+            --from-literal=KEYCLOAK_URL="${KEYCLOAK_URL}" \
+            --from-literal=KEYCLOAK_REALM="${KEYCLOAK_REALM}" \
+            --from-literal=KEYCLOAK_ADMIN_REALM="${KEYCLOAK_ADMIN_REALM}" \
+            --from-literal=KEYCLOAK_ADMIN_CLIENT_ID="${KEYCLOAK_ADMIN_CLIENT_ID}" \
+            --from-literal=KEYCLOAK_ADMIN_USERNAME="${KEYCLOAK_ADMIN_USERNAME}" \
+            --from-literal=KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD}" \
+            --from-literal=KEYCLOAK_CLIENT_ID="${KEYCLOAK_CLIENT_ID}" \
+            --from-literal=KEYCLOAK_CLIENT_SECRET="${KEYCLOAK_CLIENT_SECRET}" \
             --from-literal=MEDUSA_BASE_URL="${MEDUSA_BASE_URL}" \
             --from-literal=MEDUSA_PUBLISHABLE_KEY="${MEDUSA_PUBLISHABLE_KEY}" \
             --from-literal=MEDUSA_ADMIN_TOKEN="${MEDUSA_ADMIN_TOKEN}" \
             --from-literal=MEDUSA_WEBHOOK_SECRET="${MEDUSA_WEBHOOK_SECRET}" \
             --from-literal=STORE_PLATFORM_FEE_BPS="${STORE_PLATFORM_FEE_BPS}" \
-            --dry-run=client -o yaml | kubectl apply -f -
+            --dry-run=client -o yaml | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
 
-      - name: Apply manifests and update image
-        if: steps.preflight.outputs.should_deploy == 'true'
+          kubectl -n observability create secret generic elastic-credentials \
+            --from-literal=ELASTIC_PASSWORD="${ELASTIC_PASSWORD}" \
+            --from-literal=KIBANA_ENCRYPTION_KEY="${KIBANA_ENCRYPTION_KEY}" \
+            --from-literal=APM_SECRET_TOKEN="${APM_SECRET_TOKEN}" \
+            --dry-run=client -o yaml | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+
+      - name: Apply manifests and rollout
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
-          kubectl apply -k infra/k8s/backend/overlays/dev
-          kubectl -n kobo-dev set image deployment/social-wallet-backend \
-            social-wallet-backend=${{ needs.build-and-push.outputs.image_ref }}
-          kubectl -n kobo-dev rollout status deployment/social-wallet-backend --timeout=180s
+          : "${DEPLOY_USER:=ubuntu}"
+          kubectl kustomize infra/k8s/platform/overlays/dev | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+          kubectl kustomize infra/k8s/observability/overlays/dev | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+          kubectl kustomize infra/k8s/backend/overlays/dev | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl -n kobo-dev rollout restart deployment/social-wallet-backend && sudo kubectl -n kobo-dev rollout status deployment/social-wallet-backend --timeout=300s'
 
   deploy-prod:
     if: ${{ needs.build-and-push.outputs.target_env == 'prod' }}
@@ -157,69 +216,128 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check deployment preconditions
-        id: preflight
-        env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-        run: |
-          if [[ -z "${KUBE_CONFIG}" ]]; then
-            echo "KUBE_CONFIG secret is missing, skipping deploy."
-            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Set up kubectl
-        if: steps.preflight.outputs.should_deploy == 'true'
         uses: azure/setup-kubectl@v4
         with:
           version: v1.30.0
 
-      - name: Configure kubeconfig
-        if: steps.preflight.outputs.should_deploy == 'true'
+      - name: Configure SSH
         env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          mkdir -p "$HOME/.kube"
-          if echo "$KUBE_CONFIG" | grep -q "apiVersion:"; then
-            printf "%s" "$KUBE_CONFIG" > "$HOME/.kube/config"
-          else
-            printf "%s" "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
+          if [[ -z "${DEPLOY_SSH_KEY}" || -z "${DEPLOY_HOST}" ]]; then
+            echo "DEPLOY_SSH_KEY or DEPLOY_HOST missing"
+            exit 1
           fi
-          chmod 600 "$HOME/.kube/config"
+          mkdir -p "$HOME/.ssh"
+          printf "%s" "${DEPLOY_SSH_KEY}" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -H "${DEPLOY_HOST}" >> "$HOME/.ssh/known_hosts"
 
-      - name: Ensure namespace and secrets
-        if: steps.preflight.outputs.should_deploy == 'true'
+      - name: Prepare and apply namespaces + secrets
         env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DB_URL: ${{ secrets.DB_URL }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_SUPERUSER_PASSWORD: ${{ secrets.POSTGRES_SUPERUSER_PASSWORD }}
+          POSTGRES_APP_PASSWORD: ${{ secrets.POSTGRES_APP_PASSWORD }}
+          POSTGRES_KEYCLOAK_PASSWORD: ${{ secrets.POSTGRES_KEYCLOAK_PASSWORD }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+          BACKUP_RETENTION_DAYS: ${{ secrets.BACKUP_RETENTION_DAYS }}
           KEYCLOAK_ISSUER_URI: ${{ secrets.KEYCLOAK_ISSUER_URI }}
           KEYCLOAK_JWK_SET_URI: ${{ secrets.KEYCLOAK_JWK_SET_URI }}
+          KEYCLOAK_ISSUER_EXTERNAL: ${{ secrets.KEYCLOAK_ISSUER_EXTERNAL }}
+          KEYCLOAK_ISSUER_INTERNAL: ${{ secrets.KEYCLOAK_ISSUER_INTERNAL }}
+          KEYCLOAK_URL: ${{ secrets.KEYCLOAK_URL }}
+          KEYCLOAK_REALM: ${{ secrets.KEYCLOAK_REALM }}
+          KEYCLOAK_ADMIN_REALM: ${{ secrets.KEYCLOAK_ADMIN_REALM }}
+          KEYCLOAK_ADMIN_CLIENT_ID: ${{ secrets.KEYCLOAK_ADMIN_CLIENT_ID }}
+          KEYCLOAK_ADMIN_USERNAME: ${{ secrets.KEYCLOAK_ADMIN_USERNAME }}
+          KEYCLOAK_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
+          KEYCLOAK_CLIENT_ID: ${{ secrets.KEYCLOAK_CLIENT_ID }}
+          KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
           MEDUSA_BASE_URL: ${{ secrets.MEDUSA_BASE_URL }}
           MEDUSA_PUBLISHABLE_KEY: ${{ secrets.MEDUSA_PUBLISHABLE_KEY }}
           MEDUSA_ADMIN_TOKEN: ${{ secrets.MEDUSA_ADMIN_TOKEN }}
           MEDUSA_WEBHOOK_SECRET: ${{ secrets.MEDUSA_WEBHOOK_SECRET }}
           STORE_PLATFORM_FEE_BPS: ${{ secrets.STORE_PLATFORM_FEE_BPS }}
+          ELASTIC_PASSWORD: ${{ secrets.ELASTIC_PASSWORD }}
+          KIBANA_ENCRYPTION_KEY: ${{ secrets.KIBANA_ENCRYPTION_KEY }}
+          APM_SECRET_TOKEN: ${{ secrets.APM_SECRET_TOKEN }}
         run: |
-          kubectl create namespace kobo-prod --dry-run=client -o yaml | kubectl apply -f -
+          : "${DEPLOY_USER:=ubuntu}"
+          : "${DB_URL:=jdbc:postgresql://social-wallet-postgres:5432/social_wallet}"
+          : "${DB_USER:=social_wallet}"
+          : "${KEYCLOAK_ISSUER_URI:=http://social-wallet-keycloak:8080/realms/social-wallet}"
+          : "${KEYCLOAK_JWK_SET_URI:=http://social-wallet-keycloak:8080/realms/social-wallet/protocol/openid-connect/certs}"
+          : "${KEYCLOAK_ISSUER_EXTERNAL:=https://api.kobo.your-domain.tld/realms/social-wallet}"
+          : "${KEYCLOAK_ISSUER_INTERNAL:=http://social-wallet-keycloak:8080/realms/social-wallet}"
+          : "${KEYCLOAK_URL:=http://social-wallet-keycloak:8080}"
+          : "${KEYCLOAK_REALM:=social-wallet}"
+          : "${KEYCLOAK_ADMIN_REALM:=master}"
+          : "${KEYCLOAK_ADMIN_CLIENT_ID:=admin-cli}"
+          : "${KEYCLOAK_CLIENT_ID:=social-wallet-api}"
+          : "${BACKUP_RETENTION_DAYS:=14}"
+
+          for required in DB_PASSWORD POSTGRES_SUPERUSER_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_KEYCLOAK_PASSWORD BACKUP_ENCRYPTION_KEY KEYCLOAK_ADMIN_USERNAME KEYCLOAK_ADMIN_PASSWORD ELASTIC_PASSWORD KIBANA_ENCRYPTION_KEY APM_SECRET_TOKEN DEPLOY_HOST; do
+            if [[ -z "${!required}" ]]; then
+              echo "Missing required secret: ${required}"
+              exit 1
+            fi
+          done
+
+          kubectl create namespace kobo-prod --dry-run=client -o yaml | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+          kubectl create namespace observability --dry-run=client -o yaml | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+
+          kubectl -n kobo-prod create secret generic social-wallet-platform-secrets \
+            --from-literal=POSTGRES_SUPERUSER_PASSWORD="${POSTGRES_SUPERUSER_PASSWORD}" \
+            --from-literal=POSTGRES_APP_PASSWORD="${POSTGRES_APP_PASSWORD}" \
+            --from-literal=POSTGRES_KEYCLOAK_PASSWORD="${POSTGRES_KEYCLOAK_PASSWORD}" \
+            --from-literal=BACKUP_ENCRYPTION_KEY="${BACKUP_ENCRYPTION_KEY}" \
+            --from-literal=BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS}" \
+            --from-literal=KEYCLOAK_ADMIN_USERNAME="${KEYCLOAK_ADMIN_USERNAME}" \
+            --from-literal=KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD}" \
+            --dry-run=client -o yaml | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+
           kubectl -n kobo-prod create secret generic social-wallet-backend-secrets \
             --from-literal=DB_URL="${DB_URL}" \
             --from-literal=DB_USER="${DB_USER}" \
             --from-literal=DB_PASSWORD="${DB_PASSWORD}" \
             --from-literal=KEYCLOAK_ISSUER_URI="${KEYCLOAK_ISSUER_URI}" \
             --from-literal=KEYCLOAK_JWK_SET_URI="${KEYCLOAK_JWK_SET_URI}" \
+            --from-literal=KEYCLOAK_ISSUER_EXTERNAL="${KEYCLOAK_ISSUER_EXTERNAL}" \
+            --from-literal=KEYCLOAK_ISSUER_INTERNAL="${KEYCLOAK_ISSUER_INTERNAL}" \
+            --from-literal=KEYCLOAK_URL="${KEYCLOAK_URL}" \
+            --from-literal=KEYCLOAK_REALM="${KEYCLOAK_REALM}" \
+            --from-literal=KEYCLOAK_ADMIN_REALM="${KEYCLOAK_ADMIN_REALM}" \
+            --from-literal=KEYCLOAK_ADMIN_CLIENT_ID="${KEYCLOAK_ADMIN_CLIENT_ID}" \
+            --from-literal=KEYCLOAK_ADMIN_USERNAME="${KEYCLOAK_ADMIN_USERNAME}" \
+            --from-literal=KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD}" \
+            --from-literal=KEYCLOAK_CLIENT_ID="${KEYCLOAK_CLIENT_ID}" \
+            --from-literal=KEYCLOAK_CLIENT_SECRET="${KEYCLOAK_CLIENT_SECRET}" \
             --from-literal=MEDUSA_BASE_URL="${MEDUSA_BASE_URL}" \
             --from-literal=MEDUSA_PUBLISHABLE_KEY="${MEDUSA_PUBLISHABLE_KEY}" \
             --from-literal=MEDUSA_ADMIN_TOKEN="${MEDUSA_ADMIN_TOKEN}" \
             --from-literal=MEDUSA_WEBHOOK_SECRET="${MEDUSA_WEBHOOK_SECRET}" \
             --from-literal=STORE_PLATFORM_FEE_BPS="${STORE_PLATFORM_FEE_BPS}" \
-            --dry-run=client -o yaml | kubectl apply -f -
+            --dry-run=client -o yaml | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
 
-      - name: Apply manifests and update image
-        if: steps.preflight.outputs.should_deploy == 'true'
+          kubectl -n observability create secret generic elastic-credentials \
+            --from-literal=ELASTIC_PASSWORD="${ELASTIC_PASSWORD}" \
+            --from-literal=KIBANA_ENCRYPTION_KEY="${KIBANA_ENCRYPTION_KEY}" \
+            --from-literal=APM_SECRET_TOKEN="${APM_SECRET_TOKEN}" \
+            --dry-run=client -o yaml | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+
+      - name: Apply manifests and rollout
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
-          kubectl apply -k infra/k8s/backend/overlays/prod
-          kubectl -n kobo-prod set image deployment/social-wallet-backend \
-            social-wallet-backend=${{ needs.build-and-push.outputs.image_ref }}
-          kubectl -n kobo-prod rollout status deployment/social-wallet-backend --timeout=180s
+          : "${DEPLOY_USER:=ubuntu}"
+          kubectl kustomize infra/k8s/platform/overlays/prod | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+          kubectl kustomize infra/k8s/observability/overlays/prod | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+          kubectl kustomize infra/k8s/backend/overlays/prod | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
+          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl -n kobo-prod rollout restart deployment/social-wallet-backend && sudo kubectl -n kobo-prod rollout status deployment/social-wallet-backend --timeout=300s'

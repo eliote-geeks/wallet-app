@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-keycloak-to-postgres
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: social-wallet-postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: social-wallet-backend
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: social-wallet-keycloak
+      ports:
+        - protocol: TCP
+          port: 5432

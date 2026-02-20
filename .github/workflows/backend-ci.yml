@@ -18,6 +18,26 @@ permissions:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: social_wallet
+          POSTGRES_USER: social_wallet
+          POSTGRES_PASSWORD: social_wallet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U social_wallet -d social_wallet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/social_wallet
+      DB_USER: social_wallet
+      DB_PASSWORD: social_wallet
+      KEYCLOAK_ISSUER_URI: http://localhost:8082/realms/social-wallet
+      KEYCLOAK_JWK_SET_URI: http://localhost:8082/realms/social-wallet/protocol/openid-connect/certs
 
     steps:
       - name: Checkout
@@ -29,6 +49,9 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+
+      - name: Run tests
+        run: ./mvnw -B test
 
       - name: Build artifact (compile + package)
         run: ./mvnw -B -DskipTests package

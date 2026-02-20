@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: social-wallet-postgres-backup
+spec:
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: postgres:16
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/bash
+                - /scripts/postgres-backup.sh
+              env:
+                - name: POSTGRES_USER
+                  value: postgres
+                - name: POSTGRES_APP_DB
+                  value: social_wallet
+                - name: POSTGRES_KEYCLOAK_DB
+                  value: keycloak
+                - name: POSTGRES_SUPERUSER_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: social-wallet-platform-secrets
+                      key: POSTGRES_SUPERUSER_PASSWORD
+                - name: BACKUP_ENCRYPTION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: social-wallet-platform-secrets
+                      key: BACKUP_ENCRYPTION_KEY
+                - name: BACKUP_RETENTION_DAYS
+                  valueFrom:
+                    secretKeyRef:
+                      name: social-wallet-platform-secrets
+                      key: BACKUP_RETENTION_DAYS
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 300m
+                  memory: 512Mi
+              volumeMounts:
+                - name: backup-data
+                  mountPath: /backups
+                - name: backup-script
+                  mountPath: /scripts/postgres-backup.sh
+                  subPath: postgres-backup.sh
+          volumes:
+            - name: backup-data
+              persistentVolumeClaim:
+                claimName: social-wallet-postgres-backups
+            - name: backup-script
+              configMap:
+                name: social-wallet-postgres-backup-script
+                defaultMode: 0555
