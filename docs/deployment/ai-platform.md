@@ -53,8 +53,10 @@ chmod +x infra/k8s/ai/scripts/*.sh
 1. Créer des plans (teams) avec quota:
 ```bash
 infra/k8s/ai/scripts/bootstrap-dev-plans.sh
-infra/k8s/ai/scripts/litellm-account-cli.sh list-users
+infra/k8s/ai/scripts/litellm-account-cli.sh list-teams
 ```
+
+Le script de bootstrap est idempotent: il n'ajoute pas de doublons si un plan existe déjà.
 
 2. Créer un utilisateur API:
 ```bash

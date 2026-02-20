@@ -12,26 +12,33 @@ fi
 
 MODEL="${MODEL:-qwen2.5-7b}"
 
-echo "Creating plan: kobo-basic"
-"${CLI}" new-team \
-  --alias "kobo-basic" \
+create_if_missing() {
+  local alias="$1"
+  shift
+  local existing_id
+  existing_id="$("${CLI}" list-teams | jq -r --arg alias "${alias}" '.[] | select(.team_alias == $alias) | .team_id' | head -n 1 || true)"
+  if [[ -n "${existing_id}" ]]; then
+    echo "Plan already exists: ${alias} (${existing_id})"
+    return
+  fi
+  echo "Creating plan: ${alias}"
+  "${CLI}" new-team --alias "${alias}" "$@" | jq '{team_id: .team_id, team_alias: .team_alias}'
+}
+
+create_if_missing "kobo-basic" \
   --models "${MODEL}" \
   --monthly-budget 3 \
   --rpm 20 \
-  --tpm 40000 | jq '{team_id: .team_id, team_alias: .team_alias}'
+  --tpm 40000
 
-echo "Creating plan: kobo-plus"
-"${CLI}" new-team \
-  --alias "kobo-plus" \
+create_if_missing "kobo-plus" \
   --models "${MODEL}" \
   --monthly-budget 10 \
   --rpm 40 \
-  --tpm 80000 | jq '{team_id: .team_id, team_alias: .team_alias}'
+  --tpm 80000
 
-echo "Creating plan: kobo-pro"
-"${CLI}" new-team \
-  --alias "kobo-pro" \
+create_if_missing "kobo-pro" \
   --models "${MODEL}" \
   --monthly-budget 30 \
   --rpm 80 \
-  --tpm 160000 | jq '{team_id: .team_id, team_alias: .team_alias}'
+  --tpm 160000

@@ -27,6 +27,7 @@ Commands:
   new-team   --alias NAME [--models m1,m2] [--monthly-budget USD] [--rpm N] [--tpm N]
   new-user   --id USER_ID --email EMAIL [--role internal_user|internal_user_viewer]
   new-key    --user-id USER_ID [--team-id TEAM_ID] [--models m1,m2] [--monthly-budget USD] [--duration 30d] [--rpm N] [--tpm N]
+  list-teams
   list-users
   list-keys
 EOF
@@ -201,6 +202,11 @@ case "${cmd}" in
   list-users)
     require_master_key
     api_get "/user/list" | jq
+    ;;
+
+  list-teams)
+    require_master_key
+    api_get "/team/list" | jq
     ;;
 
   list-keys)
