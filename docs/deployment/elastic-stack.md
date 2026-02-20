@@ -1,34 +1,29 @@
-# Elastic Stack (Kubernetes)
+# Elastic Stack (Isolated)
 
-## Composants deployes
-- Elasticsearch (single-node)
-- Kibana (ingress TLS)
-- Filebeat (logs containers)
-- Metricbeat (metrics Kubernetes)
-- APM Server (endpoint traces)
+## Architecture
+- Elasticsearch + Kibana dans une stack Docker dediee sur le VPS (`/opt/kobo/elastic-isolated`).
+- Le cluster Kobo (k3s) n'heberge plus Kibana/Elasticsearch.
+- Les agents `filebeat` et `metricbeat` tournent dans `observability` (k3s) et envoient vers `http://79.137.32.27:9201`.
 
-## Namespace
-- `observability`
+## Services exposes
+- Kibana: `http://79.137.32.27:5602`
+- Elasticsearch: `9201/tcp` limite au CIDR pods `10.42.0.0/16`
 
-## Overlay dev
-- `infra/k8s/observability/overlays/dev`
-- Kibana URL: `https://kibana-dev.kobo.79.137.32.27.nip.io`
-
-## Secrets requis
-- `ELASTIC_PASSWORD`
-- `KIBANA_ENCRYPTION_KEY`
-- `APM_SECRET_TOKEN`
+## Secrets
+- Fichier: `/opt/kobo/elastic-isolated/.env`
+- Variables critiques: `ELASTIC_PASSWORD`, `KIBANA_SYSTEM_PASSWORD`, `KIBANA_ENCRYPTION_KEY`
 
 ## Verification rapide
 ```bash
-kubectl -n observability get pods
-kubectl -n observability get ingress kibana
-curl -k https://kibana-dev.kobo.79.137.32.27.nip.io
+curl -u elastic:$ELASTIC_PASSWORD http://localhost:9201/_cluster/health
+curl http://localhost:5602/api/status
+kubectl -n observability logs daemonset/filebeat --tail=50
+kubectl -n observability logs daemonset/metricbeat --tail=50
 ```
 
 ## Alerting
-- Utiliser Kibana Rules & Connectors (Index threshold, Error rate, APM latency).
-- Créer au minimum:
-  - erreur API > seuil
-  - saturation CPU/memoire pods critiques
-  - indisponibilite endpoint `/api/public/ping`
+- Script idempotent: `scripts/observability/bootstrap-kibana-rules.sh`
+- Regles configurees:
+  - `Kobo Kubernetes Warning Events`
+  - `Kobo Backend Warning Events`
+  - `Kobo Keycloak Warning Events`

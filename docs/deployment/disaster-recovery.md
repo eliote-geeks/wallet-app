@@ -4,33 +4,39 @@
 - Namespace applicatif: `kobo-dev` / `kobo-prod`
 - Donnees critiques: PostgreSQL (`social_wallet`, `keycloak`)
 - Identite: Keycloak (realm + users)
-- Observabilite: Elastic Stack
+- Observabilite: Elastic stack isole
 
 ## Objectifs
-- RPO cible: 2h (prod), 6h (dev)
-- RTO cible: 4h (prod), 8h (dev)
+- RPO cible: 2h (dev), 15min (prod cible)
+- RTO cible: 8h (dev), 60min (prod cible)
 
 ## Backup strategy
-- PostgreSQL backups chiffres via `social-wallet-postgres-backup` (CronJob)
-- Chiffrement: AES-256 (`openssl`, cle `BACKUP_ENCRYPTION_KEY`)
-- Retention: `BACKUP_RETENTION_DAYS` (defaut 14)
-- Backup path: PVC `social-wallet-postgres-backups` mounted at `/backups`
+- Backup PostgreSQL chiffre via CronJob `social-wallet-postgres-backup`
+- Chiffrement AES-256 (`openssl`) avec `BACKUP_ENCRYPTION_KEY`
+- Retention locale: `BACKUP_RETENTION_DAYS`
+- Stockage local: PVC `social-wallet-postgres-backups`
+- Offsite cible (phase prod): Object Storage S3 compatible chiffre
 
 ## Restore procedure (high level)
-1. Restaurer le cluster (k3s) et les manifests via GitHub Actions/infra K8s.
-2. Restaurer les secrets critiques (`social-wallet-platform-secrets`, `social-wallet-backend-secrets`, `elastic-credentials`).
-3. Identifier le dernier backup chiffre: `/backups/<timestamp>/social_wallet.sql.gz.enc`.
-4. Dechiffrer et restaurer dans PostgreSQL.
-5. Verifier les tables et la sante API (`/api/public/ping`).
+1. Restaurer cluster et manifests (GitHub + infra k8s).
+2. Restaurer secrets critiques (`social-wallet-platform-secrets`, `social-wallet-backend-secrets`).
+3. Recuperer dernier backup chiffre (`/backups/<timestamp>/social_wallet.sql.gz.enc`).
+4. Dechiffrer et restaurer sur PostgreSQL.
+5. Verifier API (`/api/public/ping`) + Keycloak discovery endpoint.
 
 ## Test de restauration
 - Script: `scripts/vps/test-postgres-backup-restore.sh`
-- Frequence recommandee: hebdomadaire en dev, mensuelle en prod.
-- KPI test: backup lisible, restauration SQL valide, verification de schema.
+- Frequence recommandee:
+  - dev: hebdomadaire
+  - prod: mensuelle
+- KPI test:
+  - backup lisible
+  - restauration SQL valide
+  - verification du schema/table count
 
 ## Runbook incident
-1. P1 Data loss: geler les ecritures API.
+1. Geler les ecritures API si corruption suspectee.
 2. Restaurer DB depuis dernier backup valide.
 3. Verifier IAM (Keycloak) et tokens.
-4. Rejouer/traiter manuellement les events webhook non confirmes.
-5. Publier postmortem (cause, impact, actions correctives).
+4. Rejouer/traiter les webhooks non confirms.
+5. Publier postmortem (cause, impact, actions).

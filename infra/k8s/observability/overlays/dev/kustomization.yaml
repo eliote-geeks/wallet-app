@@ -5,7 +5,3 @@ namespace: observability
 
 resources:
   - ../../base
-
-patches:
-  - path: patch-kibana-ingress.yaml
-  - path: patch-elasticsearch-resources.yaml

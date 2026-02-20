@@ -16,6 +16,9 @@ spec:
       serviceAccountName: metricbeat
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 30
       containers:
         - name: metricbeat
@@ -36,7 +39,14 @@ spec:
                 secretKeyRef:
                   name: elastic-credentials
                   key: ELASTIC_PASSWORD
+            - name: ELASTICSEARCH_HOSTS
+              valueFrom:
+                secretKeyRef:
+                  name: elastic-credentials
+                  key: ELASTICSEARCH_HOSTS
           securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             runAsUser: 0
           resources:
             requests:
@@ -49,8 +59,14 @@ spec:
             - name: config
               mountPath: /usr/share/metricbeat/metricbeat.yml
               subPath: metricbeat.yml
+            - name: data
+              mountPath: /usr/share/metricbeat/data
       volumes:
         - name: config
           configMap:
             name: metricbeat-config
             defaultMode: 0640
+        - name: data
+          hostPath:
+            path: /var/lib/metricbeat-data
+            type: DirectoryOrCreate

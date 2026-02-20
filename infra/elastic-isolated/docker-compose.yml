@@ -1,0 +1,85 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
+    container_name: elasticsearch-isolated
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "true"
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      ES_JAVA_OPTS: ${ES_JAVA_OPTS}
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    ports:
+      - "9201:9200"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -u elastic:${ELASTIC_PASSWORD} http://localhost:9200 >/dev/null"]
+      interval: 20s
+      timeout: 10s
+      retries: 20
+      start_period: 40s
+    networks:
+      - elastic-private
+
+  setup-kibana-user:
+    image: curlimages/curl:8.10.1
+    container_name: elasticsetup-isolated
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["/bin/sh", "-ec"]
+    command: |
+      code="000"
+      while [ "$$code" != "200" ]; do
+        code=$$(curl -s -o /tmp/resp.txt -w "%{http_code}" -u "elastic:${ELASTIC_PASSWORD}" \
+          -X POST "http://elasticsearch:9200/_security/user/kibana_system/_password" \
+          -H "Content-Type: application/json" \
+          -d "{\"password\":\"${KIBANA_SYSTEM_PASSWORD}\"}")
+        if [ "$$code" != "200" ]; then
+          echo "Waiting elastic security API (code=$$code)"
+          sleep 5
+        fi
+      done
+      echo "kibana_system password configured"
+    networks:
+      - elastic-private
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION}
+    container_name: kibana-isolated
+    restart: unless-stopped
+    depends_on:
+      setup-kibana-user:
+        condition: service_completed_successfully
+    environment:
+      SERVER_NAME: kibana
+      SERVER_HOST: 0.0.0.0
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: kibana_system
+      ELASTICSEARCH_PASSWORD: ${KIBANA_SYSTEM_PASSWORD}
+      XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: ${KIBANA_ENCRYPTION_KEY}
+      XPACK_SECURITY_ENCRYPTIONKEY: ${KIBANA_ENCRYPTION_KEY}
+      XPACK_REPORTING_ENCRYPTIONKEY: ${KIBANA_ENCRYPTION_KEY}
+      TELEMETRY_ENABLED: "false"
+    ports:
+      - "5602:5601"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5601/api/status >/dev/null"]
+      interval: 20s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    networks:
+      - elastic-private
+
+networks:
+  elastic-private:
+    driver: bridge
+
+volumes:
+  es-data:

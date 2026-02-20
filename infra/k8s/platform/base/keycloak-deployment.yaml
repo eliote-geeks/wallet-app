@@ -6,6 +6,8 @@ metadata:
     app.kubernetes.io/name: social-wallet-keycloak
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: social-wallet-keycloak
@@ -14,6 +16,12 @@ spec:
       labels:
         app.kubernetes.io/name: social-wallet-keycloak
     spec:
+      serviceAccountName: social-wallet-keycloak
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: keycloak
           image: quay.io/keycloak/keycloak:24.0.4
@@ -48,6 +56,8 @@ spec:
               value: "true"
             - name: KC_METRICS_ENABLED
               value: "true"
+            - name: JAVA_OPTS_APPEND
+              value: "-XX:InitialRAMPercentage=30 -XX:MaxRAMPercentage=65 -Djava.awt.headless=true"
             - name: KEYCLOAK_ADMIN
               valueFrom:
                 secretKeyRef:
@@ -61,25 +71,41 @@ spec:
           ports:
             - containerPort: 8080
               name: http
-          readinessProbe:
+          startupProbe:
             httpGet:
               path: /realms/master/.well-known/openid-configuration
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /realms/master/.well-known/openid-configuration
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
           livenessProbe:
             httpGet:
               path: /health/live
               port: 8080
-            initialDelaySeconds: 45
+            initialDelaySeconds: 60
             periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
           resources:
             requests:
-              cpu: 500m
-              memory: 1Gi
-            limits:
-              cpu: "2"
+              cpu: "1"
               memory: 2Gi
+            limits:
+              cpu: "3"
+              memory: 3Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
           volumeMounts:
             - name: realm-import
               mountPath: /opt/keycloak/data/import/social-wallet-realm.json

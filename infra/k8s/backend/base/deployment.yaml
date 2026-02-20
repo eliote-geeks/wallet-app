@@ -15,6 +15,15 @@ spec:
       labels:
         app.kubernetes.io/name: social-wallet-backend
     spec:
+      serviceAccountName: social-wallet-backend
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: social-wallet-backend
           image: ghcr.io/eliote-geeks/wallet-app-backend:dev-latest
@@ -48,4 +57,7 @@ spec:
             limits:
               cpu: "2"
               memory: 2Gi
-
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true

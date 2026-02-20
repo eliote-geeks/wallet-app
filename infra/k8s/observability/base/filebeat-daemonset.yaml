@@ -14,6 +14,9 @@ spec:
         app.kubernetes.io/name: filebeat
     spec:
       serviceAccountName: filebeat
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 30
       containers:
         - name: filebeat
@@ -30,7 +33,14 @@ spec:
                 secretKeyRef:
                   name: elastic-credentials
                   key: ELASTIC_PASSWORD
+            - name: ELASTICSEARCH_HOSTS
+              valueFrom:
+                secretKeyRef:
+                  name: elastic-credentials
+                  key: ELASTICSEARCH_HOSTS
           securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             runAsUser: 0
           resources:
             requests:

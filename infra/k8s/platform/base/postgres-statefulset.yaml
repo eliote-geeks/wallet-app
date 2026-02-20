@@ -15,6 +15,15 @@ spec:
       labels:
         app.kubernetes.io/name: social-wallet-postgres
     spec:
+      serviceAccountName: social-wallet-postgres
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: postgres
           image: postgres:16
@@ -73,6 +82,10 @@ spec:
             limits:
               cpu: "1"
               memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data

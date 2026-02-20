@@ -3,11 +3,14 @@ kind: Kustomization
 
 resources:
   - postgres-service.yaml
+  - postgres-serviceaccount.yaml
   - postgres-statefulset.yaml
   - postgres-pdb.yaml
   - postgres-backup-pvc.yaml
+  - postgres-backup-serviceaccount.yaml
   - postgres-backup-cronjob.yaml
   - keycloak-service.yaml
+  - keycloak-serviceaccount.yaml
   - keycloak-deployment.yaml
   - keycloak-pdb.yaml
   - keycloak-hpa.yaml
@@ -15,6 +18,7 @@ resources:
   - networkpolicy-allow-traefik-to-public.yaml
   - networkpolicy-allow-backend-to-keycloak.yaml
   - networkpolicy-allow-backend-keycloak-to-postgres.yaml
+  - networkpolicy-allow-backup-to-postgres.yaml
 
 configMapGenerator:
   - name: social-wallet-postgres-init

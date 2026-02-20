@@ -24,6 +24,6 @@ data:
         period: 30s
 
     output.elasticsearch:
-      hosts: ["http://elasticsearch:9200"]
+      hosts: ["${ELASTICSEARCH_HOSTS}"]
       username: elastic
       password: ${ELASTIC_PASSWORD}

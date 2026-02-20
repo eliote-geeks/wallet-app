@@ -21,6 +21,6 @@ data:
                 logs_path: "/var/log/containers/"
 
     output.elasticsearch:
-      hosts: ["http://elasticsearch:9200"]
+      hosts: ["${ELASTICSEARCH_HOSTS}"]
       username: elastic
       password: ${ELASTIC_PASSWORD}

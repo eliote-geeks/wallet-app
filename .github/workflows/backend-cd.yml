@@ -72,7 +72,7 @@ jobs:
 
   deploy-dev:
     if: ${{ needs.build-and-push.outputs.target_env == 'dev' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, kobo]
     needs: build-and-push
     environment: dev
 
@@ -129,6 +129,7 @@ jobs:
           MEDUSA_WEBHOOK_SECRET: ${{ secrets.MEDUSA_WEBHOOK_SECRET }}
           STORE_PLATFORM_FEE_BPS: ${{ secrets.STORE_PLATFORM_FEE_BPS }}
           ELASTIC_PASSWORD: ${{ secrets.ELASTIC_PASSWORD }}
+          ELASTICSEARCH_HOSTS: ${{ secrets.ELASTICSEARCH_HOSTS }}
           KIBANA_ENCRYPTION_KEY: ${{ secrets.KIBANA_ENCRYPTION_KEY }}
           APM_SECRET_TOKEN: ${{ secrets.APM_SECRET_TOKEN }}
         run: |
@@ -145,6 +146,7 @@ jobs:
           : "${KEYCLOAK_ADMIN_CLIENT_ID:=admin-cli}"
           : "${KEYCLOAK_CLIENT_ID:=social-wallet-api}"
           : "${BACKUP_RETENTION_DAYS:=14}"
+          : "${ELASTICSEARCH_HOSTS:=http://79.137.32.27:9201}"
 
           for required in DB_PASSWORD POSTGRES_SUPERUSER_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_KEYCLOAK_PASSWORD BACKUP_ENCRYPTION_KEY KEYCLOAK_ADMIN_USERNAME KEYCLOAK_ADMIN_PASSWORD ELASTIC_PASSWORD KIBANA_ENCRYPTION_KEY APM_SECRET_TOKEN DEPLOY_HOST; do
             if [[ -z "${!required}" ]]; then
@@ -191,6 +193,7 @@ jobs:
 
           kubectl -n observability create secret generic elastic-credentials \
             --from-literal=ELASTIC_PASSWORD="${ELASTIC_PASSWORD}" \
+            --from-literal=ELASTICSEARCH_HOSTS="${ELASTICSEARCH_HOSTS}" \
             --from-literal=KIBANA_ENCRYPTION_KEY="${KIBANA_ENCRYPTION_KEY}" \
             --from-literal=APM_SECRET_TOKEN="${APM_SECRET_TOKEN}" \
             --dry-run=client -o yaml | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
@@ -201,15 +204,24 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
           : "${DEPLOY_USER:=ubuntu}"
-          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl -n kobo-dev delete deployment/social-wallet-keycloak deployment/social-wallet-postgres --ignore-not-found=true'
+          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl -n kobo-dev delete deployment/social-wallet-keycloak --ignore-not-found=true'
           kubectl kustomize infra/k8s/platform/overlays/dev | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
           kubectl kustomize infra/k8s/observability/overlays/dev | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
           kubectl kustomize infra/k8s/backend/overlays/dev | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
-          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl -n kobo-dev rollout restart deployment/social-wallet-backend && sudo kubectl -n kobo-dev rollout status deployment/social-wallet-backend --timeout=300s'
+          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'set -euo pipefail
+            PG_POD=$(sudo kubectl -n kobo-dev get pod -l app.kubernetes.io/name=social-wallet-postgres -o jsonpath="{.items[0].metadata.name}")
+            sudo kubectl -n kobo-dev exec "${PG_POD}" -- sh -lc '\''psql -U postgres -d social_wallet -c "ALTER SCHEMA public OWNER TO social_wallet; GRANT ALL ON SCHEMA public TO social_wallet; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO social_wallet; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO social_wallet;"'\''
+            sudo kubectl -n kobo-dev exec "${PG_POD}" -- sh -lc '\''psql -U postgres -d keycloak -c "ALTER SCHEMA public OWNER TO keycloak; GRANT ALL ON SCHEMA public TO keycloak; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO keycloak; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO keycloak;"'\''
+            sudo kubectl -n kobo-dev rollout restart deployment/social-wallet-keycloak deployment/social-wallet-backend
+            sudo kubectl -n observability rollout restart daemonset/filebeat daemonset/metricbeat
+            sudo kubectl -n kobo-dev rollout status deployment/social-wallet-keycloak --timeout=600s
+            sudo kubectl -n kobo-dev rollout status deployment/social-wallet-backend --timeout=300s
+            sudo kubectl -n observability rollout status daemonset/filebeat --timeout=300s
+            sudo kubectl -n observability rollout status daemonset/metricbeat --timeout=300s'
 
   deploy-prod:
     if: ${{ needs.build-and-push.outputs.target_env == 'prod' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, kobo]
     needs: build-and-push
     environment: production
 
@@ -266,6 +278,7 @@ jobs:
           MEDUSA_WEBHOOK_SECRET: ${{ secrets.MEDUSA_WEBHOOK_SECRET }}
           STORE_PLATFORM_FEE_BPS: ${{ secrets.STORE_PLATFORM_FEE_BPS }}
           ELASTIC_PASSWORD: ${{ secrets.ELASTIC_PASSWORD }}
+          ELASTICSEARCH_HOSTS: ${{ secrets.ELASTICSEARCH_HOSTS }}
           KIBANA_ENCRYPTION_KEY: ${{ secrets.KIBANA_ENCRYPTION_KEY }}
           APM_SECRET_TOKEN: ${{ secrets.APM_SECRET_TOKEN }}
         run: |
@@ -282,6 +295,7 @@ jobs:
           : "${KEYCLOAK_ADMIN_CLIENT_ID:=admin-cli}"
           : "${KEYCLOAK_CLIENT_ID:=social-wallet-api}"
           : "${BACKUP_RETENTION_DAYS:=14}"
+          : "${ELASTICSEARCH_HOSTS:=http://79.137.32.27:9201}"
 
           for required in DB_PASSWORD POSTGRES_SUPERUSER_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_KEYCLOAK_PASSWORD BACKUP_ENCRYPTION_KEY KEYCLOAK_ADMIN_USERNAME KEYCLOAK_ADMIN_PASSWORD ELASTIC_PASSWORD KIBANA_ENCRYPTION_KEY APM_SECRET_TOKEN DEPLOY_HOST; do
             if [[ -z "${!required}" ]]; then
@@ -328,6 +342,7 @@ jobs:
 
           kubectl -n observability create secret generic elastic-credentials \
             --from-literal=ELASTIC_PASSWORD="${ELASTIC_PASSWORD}" \
+            --from-literal=ELASTICSEARCH_HOSTS="${ELASTICSEARCH_HOSTS}" \
             --from-literal=KIBANA_ENCRYPTION_KEY="${KIBANA_ENCRYPTION_KEY}" \
             --from-literal=APM_SECRET_TOKEN="${APM_SECRET_TOKEN}" \
             --dry-run=client -o yaml | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
@@ -338,8 +353,17 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
           : "${DEPLOY_USER:=ubuntu}"
-          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl -n kobo-prod delete deployment/social-wallet-keycloak deployment/social-wallet-postgres --ignore-not-found=true'
+          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl -n kobo-prod delete deployment/social-wallet-keycloak --ignore-not-found=true'
           kubectl kustomize infra/k8s/platform/overlays/prod | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
           kubectl kustomize infra/k8s/observability/overlays/prod | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
           kubectl kustomize infra/k8s/backend/overlays/prod | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
-          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl -n kobo-prod rollout restart deployment/social-wallet-backend && sudo kubectl -n kobo-prod rollout status deployment/social-wallet-backend --timeout=300s'
+          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'set -euo pipefail
+            PG_POD=$(sudo kubectl -n kobo-prod get pod -l app.kubernetes.io/name=social-wallet-postgres -o jsonpath="{.items[0].metadata.name}")
+            sudo kubectl -n kobo-prod exec "${PG_POD}" -- sh -lc '\''psql -U postgres -d social_wallet -c "ALTER SCHEMA public OWNER TO social_wallet; GRANT ALL ON SCHEMA public TO social_wallet; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO social_wallet; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO social_wallet;"'\''
+            sudo kubectl -n kobo-prod exec "${PG_POD}" -- sh -lc '\''psql -U postgres -d keycloak -c "ALTER SCHEMA public OWNER TO keycloak; GRANT ALL ON SCHEMA public TO keycloak; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO keycloak; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO keycloak;"'\''
+            sudo kubectl -n kobo-prod rollout restart deployment/social-wallet-keycloak deployment/social-wallet-backend
+            sudo kubectl -n observability rollout restart daemonset/filebeat daemonset/metricbeat
+            sudo kubectl -n kobo-prod rollout status deployment/social-wallet-keycloak --timeout=600s
+            sudo kubectl -n kobo-prod rollout status deployment/social-wallet-backend --timeout=300s
+            sudo kubectl -n observability rollout status daemonset/filebeat --timeout=300s
+            sudo kubectl -n observability rollout status daemonset/metricbeat --timeout=300s'
