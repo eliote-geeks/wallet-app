@@ -2,9 +2,16 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: social-wallet-backend
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
 spec:
+  tls:
+    - hosts:
+        - api-dev.kobo.79.137.32.27.nip.io
+      secretName: api-dev-kobo-tls
   rules:
-    - host: api-dev.kobo.your-domain.tld
+    - host: api-dev.kobo.79.137.32.27.nip.io
       http:
         paths:
           - path: /
@@ -14,4 +21,3 @@ spec:
                 name: social-wallet-backend
                 port:
                   number: 80
-
