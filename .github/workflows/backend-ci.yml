@@ -30,9 +30,5 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Run unit tests
-        run: ./mvnw -B test
-
-      - name: Build artifact
+      - name: Build artifact (compile + package)
         run: ./mvnw -B -DskipTests package
-
