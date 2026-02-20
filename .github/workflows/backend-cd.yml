@@ -201,6 +201,7 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
           : "${DEPLOY_USER:=ubuntu}"
+          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl -n kobo-dev delete deployment/social-wallet-keycloak deployment/social-wallet-postgres --ignore-not-found=true'
           kubectl kustomize infra/k8s/platform/overlays/dev | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
           kubectl kustomize infra/k8s/observability/overlays/dev | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
           kubectl kustomize infra/k8s/backend/overlays/dev | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
@@ -337,6 +338,7 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
           : "${DEPLOY_USER:=ubuntu}"
+          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl -n kobo-prod delete deployment/social-wallet-keycloak deployment/social-wallet-postgres --ignore-not-found=true'
           kubectl kustomize infra/k8s/platform/overlays/prod | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
           kubectl kustomize infra/k8s/observability/overlays/prod | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
           kubectl kustomize infra/k8s/backend/overlays/prod | ssh "${DEPLOY_USER}@${DEPLOY_HOST}" 'sudo kubectl apply -f -'
