@@ -87,15 +87,15 @@ jobs:
 
       - name: Configure SSH
         env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          if [[ -z "${DEPLOY_SSH_KEY}" || -z "${DEPLOY_HOST}" ]]; then
-            echo "DEPLOY_SSH_KEY or DEPLOY_HOST missing"
+          if [[ -z "${DEPLOY_SSH_KEY_B64}" || -z "${DEPLOY_HOST}" ]]; then
+            echo "DEPLOY_SSH_KEY_B64 or DEPLOY_HOST missing"
             exit 1
           fi
           mkdir -p "$HOME/.ssh"
-          printf "%s" "${DEPLOY_SSH_KEY}" > "$HOME/.ssh/id_ed25519"
+          printf "%s" "${DEPLOY_SSH_KEY_B64}" | base64 -d > "$HOME/.ssh/id_ed25519"
           chmod 600 "$HOME/.ssh/id_ed25519"
           ssh-keyscan -H "${DEPLOY_HOST}" >> "$HOME/.ssh/known_hosts"
 
@@ -223,15 +223,15 @@ jobs:
 
       - name: Configure SSH
         env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          if [[ -z "${DEPLOY_SSH_KEY}" || -z "${DEPLOY_HOST}" ]]; then
-            echo "DEPLOY_SSH_KEY or DEPLOY_HOST missing"
+          if [[ -z "${DEPLOY_SSH_KEY_B64}" || -z "${DEPLOY_HOST}" ]]; then
+            echo "DEPLOY_SSH_KEY_B64 or DEPLOY_HOST missing"
             exit 1
           fi
           mkdir -p "$HOME/.ssh"
-          printf "%s" "${DEPLOY_SSH_KEY}" > "$HOME/.ssh/id_ed25519"
+          printf "%s" "${DEPLOY_SSH_KEY_B64}" | base64 -d > "$HOME/.ssh/id_ed25519"
           chmod 600 "$HOME/.ssh/id_ed25519"
           ssh-keyscan -H "${DEPLOY_HOST}" >> "$HOME/.ssh/known_hosts"
 
