@@ -2,9 +2,8 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: social-wallet-backend
-  annotations:
-    kubernetes.io/ingress.class: nginx
 spec:
+  ingressClassName: traefik
   rules:
     - host: api.dev.kobo.local
       http:
@@ -16,4 +15,3 @@ spec:
                 name: social-wallet-backend
                 port:
                   number: 80
-
