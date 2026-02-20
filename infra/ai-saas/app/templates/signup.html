@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <h1>Creer un compte</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form action="/signup" method="post" class="form-grid">
+    <label>Nom complet
+      <input type="text" name="full_name" required />
+    </label>
+    <label>Email
+      <input type="email" name="email" required />
+    </label>
+    <label>Mot de passe
+      <input type="password" name="password" minlength="8" required />
+    </label>
+    <button type="submit">Creer mon compte</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-saas-portal
+  namespace: ai-saas-dev
+  labels:
+    app.kubernetes.io/name: ai-saas-portal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-saas-portal
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ai-saas-portal
+    spec:
+      serviceAccountName: ai-saas-portal
+      automountServiceAccountToken: false
+      containers:
+        - name: ai-saas-portal
+          image: ghcr.io/eliote-geeks/wallet-app-ai-saas:dev-latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: APP_NAME
+              value: "Kobo AI"
+            - name: APP_URL
+              value: "http://ai-portal-dev.kobo.79.137.32.27.nip.io"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ai-saas-secrets
+                  key: DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ai-saas-secrets
+                  key: JWT_SECRET
+            - name: PAYMENT_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ai-saas-secrets
+                  key: PAYMENT_WEBHOOK_SECRET
+            - name: LITELLM_URL
+              value: "http://litellm.ai-dev.svc.cluster.local:4000"
+            - name: LITELLM_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-saas-secrets
+                  key: LITELLM_MASTER_KEY
+            - name: DEFAULT_MODEL
+              value: "qwen2.5-7b"
+            - name: COOKIE_SECURE
+              value: "false"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

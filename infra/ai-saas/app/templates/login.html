@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <h1>Connexion</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form action="/login" method="post" class="form-grid">
+    <label>Email
+      <input type="email" name="email" required />
+    </label>
+    <label>Mot de passe
+      <input type="password" name="password" required />
+    </label>
+    <button type="submit">Se connecter</button>
+  </form>
+</section>
+{% endblock %}

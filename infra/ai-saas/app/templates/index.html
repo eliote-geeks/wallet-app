@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Ton IA locale, vendable en abonnement</h1>
+  <p>Inscription simple, plans en XAF, activation automatique de la clé API.</p>
+  {% if user %}
+  <a class="cta" href="/dashboard">Aller au dashboard</a>
+  {% else %}
+  <a class="cta" href="/signup">Commencer</a>
+  {% endif %}
+</section>
+
+<section class="pricing">
+  {% for plan in plans %}
+  <article class="card">
+    <h2>{{ plan.name }}</h2>
+    <p>{{ plan.description }}</p>
+    <div class="price">{{ "{:,.0f}".format(plan.amount).replace(",", " ") }} {{ plan.currency }} / {{ plan.duration_days }}j</div>
+    <ul>
+      <li>Budget LLM: {{ plan.monthly_budget_usd }} USD/mois</li>
+      <li>RPS: {{ plan.rpm_limit }} req/min</li>
+      <li>TPM: {{ plan.tpm_limit }}</li>
+      <li>Modele: {{ plan.model_name }}</li>
+    </ul>
+    {% if user %}
+    <form action="/checkout/start" method="post">
+      <input type="hidden" name="plan_code" value="{{ plan.code }}" />
+      <button type="submit">Choisir {{ plan.name }}</button>
+    </form>
+    {% else %}
+    <a class="cta small" href="/signup">S'inscrire</a>
+    {% endif %}
+  </article>
+  {% endfor %}
+</section>
+{% endblock %}

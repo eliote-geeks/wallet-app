@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-saas-postgres
+  namespace: ai-saas-dev
+spec:
+  selector:
+    app.kubernetes.io/name: ai-saas-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

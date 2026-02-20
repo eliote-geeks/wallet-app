@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ app_name }}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">{{ app_name }}</a>
+    <nav>
+      <a href="/">Pricing</a>
+      {% if user %}
+      <a href="/dashboard">Dashboard</a>
+      <form action="/logout" method="post" class="inline-form">
+        <button type="submit" class="link-btn">Logout</button>
+      </form>
+      {% else %}
+      <a href="/login">Login</a>
+      <a class="pill" href="/signup">Sign up</a>
+      {% endif %}
+    </nav>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <h1>Paiement Mock</h1>
+  <p>Payment ID: <code>{{ payment.id }}</code></p>
+  <p>Plan: <strong>{{ plan.name if plan else payment.plan_id }}</strong></p>
+  <p>Montant: <strong>{{ payment.amount }} {{ payment.currency }}</strong></p>
+
+  <div class="row">
+    <form method="post" action="/checkout/mock/{{ payment.id }}/complete" class="inline-form">
+      <input type="hidden" name="status_value" value="success" />
+      <button type="submit">Simuler SUCCESS</button>
+    </form>
+
+    <form method="post" action="/checkout/mock/{{ payment.id }}/complete" class="inline-form">
+      <input type="hidden" name="status_value" value="failed" />
+      <button type="submit" class="secondary">Simuler FAILED</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

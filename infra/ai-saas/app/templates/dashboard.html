@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <h1>Bonjour {{ user.full_name }}</h1>
+  <p>Email: <strong>{{ user.email }}</strong></p>
+  {% if active_sub and current_plan %}
+  <p>Abonnement actif: <strong>{{ current_plan.name }}</strong> jusqu'au {{ active_sub.end_at.strftime('%Y-%m-%d') if active_sub.end_at else 'N/A' }}</p>
+  {% else %}
+  <p>Aucun abonnement actif pour le moment.</p>
+  {% endif %}
+
+  <div class="api-box">
+    <h3>Cle API utilisateur</h3>
+    {% if api_key_full %}
+    <p>Masquee: <code>{{ api_key_masked }}</code></p>
+    <details>
+      <summary>Afficher la cle complete</summary>
+      <code>{{ api_key_full }}</code>
+    </details>
+    {% else %}
+    <p>Pas encore generee. Choisis un plan et paie pour l'activer.</p>
+    {% endif %}
+    <p>Endpoint API: <code>{{ api_url }}/v1/chat/completions</code></p>
+  </div>
+</section>
+
+<section class="pricing">
+  {% for plan in plans %}
+  <article class="card">
+    <h2>{{ plan.name }}</h2>
+    <div class="price">{{ "{:,.0f}".format(plan.amount).replace(",", " ") }} {{ plan.currency }}</div>
+    <ul>
+      <li>Budget: {{ plan.monthly_budget_usd }} USD/mois</li>
+      <li>RPM: {{ plan.rpm_limit }}</li>
+      <li>TPM: {{ plan.tpm_limit }}</li>
+    </ul>
+    <form action="/checkout/start" method="post">
+      <input type="hidden" name="plan_code" value="{{ plan.code }}" />
+      <button type="submit">Payer (Mock)</button>
+    </form>
+  </article>
+  {% endfor %}
+</section>
+
+<section class="panel">
+  <h3>Historique paiements</h3>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Montant</th><th>Statut</th><th>Date</th></tr>
+    </thead>
+    <tbody>
+      {% for p in payments %}
+      <tr>
+        <td><code>{{ p.id }}</code></td>
+        <td>{{ p.amount }} {{ p.currency }}</td>
+        <td>{{ p.status }}</td>
+        <td>{{ p.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">Aucun paiement</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
