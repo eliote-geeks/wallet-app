@@ -80,12 +80,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check deployment preconditions
+        id: preflight
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          if [[ -z "${KUBE_CONFIG}" ]]; then
+            echo "KUBE_CONFIG secret is missing, skipping deploy."
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up kubectl
+        if: steps.preflight.outputs.should_deploy == 'true'
         uses: azure/setup-kubectl@v4
         with:
           version: v1.30.0
 
       - name: Configure kubeconfig
+        if: steps.preflight.outputs.should_deploy == 'true'
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         run: |
@@ -98,6 +112,7 @@ jobs:
           chmod 600 "$HOME/.kube/config"
 
       - name: Ensure namespace and secrets
+        if: steps.preflight.outputs.should_deploy == 'true'
         env:
           DB_URL: ${{ secrets.DB_URL }}
           DB_USER: ${{ secrets.DB_USER }}
@@ -125,6 +140,7 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply manifests and update image
+        if: steps.preflight.outputs.should_deploy == 'true'
         run: |
           kubectl apply -k infra/k8s/backend/overlays/dev
           kubectl -n kobo-dev set image deployment/social-wallet-backend \
@@ -141,12 +157,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check deployment preconditions
+        id: preflight
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          if [[ -z "${KUBE_CONFIG}" ]]; then
+            echo "KUBE_CONFIG secret is missing, skipping deploy."
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up kubectl
+        if: steps.preflight.outputs.should_deploy == 'true'
         uses: azure/setup-kubectl@v4
         with:
           version: v1.30.0
 
       - name: Configure kubeconfig
+        if: steps.preflight.outputs.should_deploy == 'true'
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         run: |
@@ -159,6 +189,7 @@ jobs:
           chmod 600 "$HOME/.kube/config"
 
       - name: Ensure namespace and secrets
+        if: steps.preflight.outputs.should_deploy == 'true'
         env:
           DB_URL: ${{ secrets.DB_URL }}
           DB_USER: ${{ secrets.DB_USER }}
@@ -186,9 +217,9 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply manifests and update image
+        if: steps.preflight.outputs.should_deploy == 'true'
         run: |
           kubectl apply -k infra/k8s/backend/overlays/prod
           kubectl -n kobo-prod set image deployment/social-wallet-backend \
             social-wallet-backend=${{ needs.build-and-push.outputs.image_ref }}
           kubectl -n kobo-prod rollout status deployment/social-wallet-backend --timeout=180s
-
