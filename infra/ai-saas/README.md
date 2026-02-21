@@ -1,9 +1,9 @@
 # AI SaaS Portal (separe de Kobo)
 
-Service SaaS minimal pour vendre des comptes IA:
+Service SaaS pour vendre des comptes IA:
 - Auth (signup/login)
 - Pricing
-- Checkout + webhook (provider `mock` pour dev)
+- Checkout
 - Activation automatique LiteLLM (creation user + cle API + quotas)
 
 ## Variables d'environnement
@@ -14,7 +14,10 @@ Service SaaS minimal pour vendre des comptes IA:
 - `JWT_SECRET`
 - `JWT_EXP_MINUTES` (default `43200` = 30 jours)
 - `COOKIE_SECURE` (`true` si HTTPS)
+- `PAYMENT_MODE` (`mock` ou `manual`)
 - `PAYMENT_WEBHOOK_SECRET`
+- `ADMIN_API_SECRET` (obligatoire pour valider/rejeter paiements manuels)
+- `MANUAL_PAYMENT_INSTRUCTIONS`
 - `LITELLM_URL` (ex: `http://litellm.ai-dev.svc.cluster.local:4000`)
 - `LITELLM_MASTER_KEY`
 - `DEFAULT_MODEL` (ex: `qwen2.5-7b`)
@@ -28,19 +31,40 @@ source .venv/bin/activate
 pip install -r requirements.txt
 export DATABASE_URL="postgresql+psycopg2://ai_saas:ai_saas@localhost:5432/ai_saas"
 export JWT_SECRET="change-me"
+export PAYMENT_MODE="manual"
 export PAYMENT_WEBHOOK_SECRET="change-me"
+export ADMIN_API_SECRET="change-admin-secret"
+export MANUAL_PAYMENT_INSTRUCTIONS="Paye via Mobile Money puis partage la reference"
 export LITELLM_URL="http://localhost:4000"
 export LITELLM_MASTER_KEY="sk-..."
 uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
-## Flux MVP
+## Sans API de paiement: comment ca marche
 
-1. User signup/login.
-2. User choisit un plan.
-3. Checkout mock (simuler SUCCESS).
-4. Webhook traite le paiement et active l'abonnement.
-5. LiteLLM genere une cle API utilisateur (visible dans dashboard).
+1. L'utilisateur lance checkout (status `PENDING`).
+2. Il paie hors plateforme (Mobile Money, virement, etc.).
+3. L'admin valide le paiement via endpoint admin.
+4. Le backend active l'abonnement et genere la cle API LiteLLM.
+
+Endpoints admin manuels:
+
+- `GET /api/admin/payments/pending`
+- `POST /api/admin/payments/{payment_id}/approve`
+- `POST /api/admin/payments/{payment_id}/reject`
+
+Header requis:
+
+- `X-Admin-Secret: <ADMIN_API_SECRET>`
+
+Exemple approbation:
+
+```bash
+curl -X POST "http://localhost:8080/api/admin/payments/<payment_id>/approve" \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Secret: change-admin-secret" \
+  -d '{"provider_ref":"momo-12345","note":"Paiement recu"}'
+```
 
 ## Kubernetes secrets
 
@@ -55,3 +79,6 @@ Ne pas l'appliquer en production. Creer `ai-saas-secrets` via `kubectl create se
 - `POST /api/checkout/create`
 - `POST /api/payments/webhook/mock`
 - `GET /api/subscription/status`
+- `GET /api/admin/payments/pending`
+- `POST /api/admin/payments/{payment_id}/approve`
+- `POST /api/admin/payments/{payment_id}/reject`

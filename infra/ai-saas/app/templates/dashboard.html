@@ -3,6 +3,7 @@
 <section class="panel">
   <h1>Bonjour {{ user.full_name }}</h1>
   <p>Email: <strong>{{ user.email }}</strong></p>
+  <p>Mode paiement: <strong>{{ payment_mode|upper }}</strong></p>
   {% if active_sub and current_plan %}
   <p>Abonnement actif: <strong>{{ current_plan.name }}</strong> jusqu'au {{ active_sub.end_at.strftime('%Y-%m-%d') if active_sub.end_at else 'N/A' }}</p>
   {% else %}
@@ -21,6 +22,12 @@
     <p>Pas encore generee. Choisis un plan et paie pour l'activer.</p>
     {% endif %}
     <p>Endpoint API: <code>{{ api_url }}/v1/chat/completions</code></p>
+    {% if payment_mode == 'manual' %}
+    <div class="manual-instructions">
+      <strong>Instructions paiement manuel:</strong>
+      <p>{{ manual_payment_instructions }}</p>
+    </div>
+    {% endif %}
   </div>
 </section>
 
@@ -36,7 +43,7 @@
     </ul>
     <form action="/checkout/start" method="post">
       <input type="hidden" name="plan_code" value="{{ plan.code }}" />
-      <button type="submit">Payer (Mock)</button>
+      <button type="submit">{% if payment_mode == 'manual' %}Payer (manuel){% else %}Payer (mock){% endif %}</button>
     </form>
   </article>
   {% endfor %}

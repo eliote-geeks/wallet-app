@@ -51,6 +51,12 @@ class Settings:
     jwt_secret: str = os.getenv("JWT_SECRET", "change-this-in-prod")
     jwt_exp_minutes: int = int(os.getenv("JWT_EXP_MINUTES", "43200"))  # 30 days
     payment_webhook_secret: str = os.getenv("PAYMENT_WEBHOOK_SECRET", "change-me")
+    payment_mode: str = os.getenv("PAYMENT_MODE", "mock").lower()
+    admin_api_secret: str = os.getenv("ADMIN_API_SECRET", "change-admin-secret")
+    manual_payment_instructions: str = os.getenv(
+        "MANUAL_PAYMENT_INSTRUCTIONS",
+        "Envoie le montant par Mobile Money puis partage la reference dans le support.",
+    )
     litellm_url: str = os.getenv("LITELLM_URL", "http://litellm.ai-dev.svc.cluster.local:4000")
     litellm_master_key: str = os.getenv("LITELLM_MASTER_KEY", "")
     default_model: str = os.getenv("DEFAULT_MODEL", "qwen2.5-7b")
@@ -169,6 +175,11 @@ class PlanOut(BaseModel):
     currency: str
     amount: int
     duration_days: int
+
+
+class AdminPaymentActionInput(BaseModel):
+    provider_ref: Optional[str] = None
+    note: Optional[str] = None
 
 
 def get_db() -> Session:
@@ -375,6 +386,15 @@ def mask_key(value: Optional[str]) -> Optional[str]:
     return f"{value[:6]}...{value[-4:]}"
 
 
+def is_manual_payment_mode() -> bool:
+    return settings.payment_mode in {"manual", "offline"}
+
+
+def require_admin_secret(x_admin_secret: Optional[str]) -> None:
+    if x_admin_secret != settings.admin_api_secret:
+        raise HTTPException(status_code=401, detail="Invalid admin secret")
+
+
 async def activate_subscription(db: Session, user: User, plan: Plan, payment: Payment) -> str:
     litellm_user_id = await ensure_litellm_user(user)
     team_id = await resolve_team_id(plan.litellm_team_alias)
@@ -472,6 +492,8 @@ def home(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
             "app_name": settings.app_name,
             "plans": plans,
             "user": user,
+            "payment_mode": settings.payment_mode,
+            "manual_payment_instructions": settings.manual_payment_instructions,
         },
     )
 
@@ -608,6 +630,8 @@ def dashboard(request: Request, current_user: User = Depends(get_current_user), 
             "api_key_masked": mask_key(current_user.litellm_api_key),
             "api_key_full": current_user.litellm_api_key,
             "api_url": settings.litellm_url,
+            "payment_mode": settings.payment_mode,
+            "manual_payment_instructions": settings.manual_payment_instructions,
         },
     )
 
@@ -619,16 +643,19 @@ def checkout_start(
     db: Session = Depends(get_db),
 ) -> Response:
     plan = require_plan(db, plan_code)
+    provider = "manual" if is_manual_payment_mode() else "mock"
     payment = Payment(
         user_id=current_user.id,
         plan_id=plan.id,
-        provider="mock",
+        provider=provider,
         status="PENDING",
         amount=plan.amount,
         currency=plan.currency,
     )
     db.add(payment)
     db.commit()
+    if is_manual_payment_mode():
+        return RedirectResponse(url=f"/checkout/manual/{payment.id}", status_code=status.HTTP_303_SEE_OTHER)
     return RedirectResponse(url=f"/checkout/mock/{payment.id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -651,6 +678,30 @@ def checkout_mock_page(
             "user": current_user,
             "payment": payment,
             "plan": plan,
+        },
+    )
+
+
+@app.get("/checkout/manual/{payment_id}", response_class=HTMLResponse)
+def checkout_manual_page(
+    payment_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    payment = db.get(Payment, payment_id)
+    if not payment or payment.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    plan = db.get(Plan, payment.plan_id)
+    return templates.TemplateResponse(
+        "manual_checkout.html",
+        {
+            "request": request,
+            "app_name": settings.app_name,
+            "user": current_user,
+            "payment": payment,
+            "plan": plan,
+            "manual_payment_instructions": settings.manual_payment_instructions,
         },
     )
 
@@ -745,21 +796,23 @@ def api_checkout_create(
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
     plan = require_plan(db, payload.plan_code)
+    provider = "manual" if is_manual_payment_mode() else "mock"
     payment = Payment(
         user_id=current_user.id,
         plan_id=plan.id,
-        provider="mock",
+        provider=provider,
         status="PENDING",
         amount=plan.amount,
         currency=plan.currency,
     )
     db.add(payment)
     db.commit()
-
+    checkout_path = "/checkout/manual" if is_manual_payment_mode() else "/checkout/mock"
     return {
         "payment_id": payment.id,
-        "checkout_url": f"{settings.app_url}/checkout/mock/{payment.id}",
+        "checkout_url": f"{settings.app_url}{checkout_path}/{payment.id}",
         "status": payment.status,
+        "provider": provider,
     }
 
 
@@ -773,6 +826,67 @@ async def api_webhook_mock(
         raise HTTPException(status_code=401, detail="Invalid webhook secret")
 
     payment = await handle_payment_status(db, payload)
+    return {"payment_id": payment.id, "status": payment.status}
+
+
+@app.get("/api/admin/payments/pending")
+def api_admin_pending_payments(
+    x_admin_secret: Optional[str] = Header(default=None, alias="X-Admin-Secret"),
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    require_admin_secret(x_admin_secret)
+    pending = db.scalars(select(Payment).where(Payment.status == "PENDING").order_by(Payment.created_at.asc())).all()
+    items: list[dict[str, Any]] = []
+    for payment in pending:
+        user = db.get(User, payment.user_id)
+        plan = db.get(Plan, payment.plan_id)
+        items.append(
+            {
+                "payment_id": payment.id,
+                "email": user.email if user else None,
+                "plan": plan.code if plan else None,
+                "amount": payment.amount,
+                "currency": payment.currency,
+                "provider": payment.provider,
+                "created_at": payment.created_at.isoformat() if payment.created_at else None,
+            }
+        )
+    return items
+
+
+@app.post("/api/admin/payments/{payment_id}/approve")
+async def api_admin_approve_payment(
+    payment_id: str,
+    payload: AdminPaymentActionInput,
+    x_admin_secret: Optional[str] = Header(default=None, alias="X-Admin-Secret"),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    require_admin_secret(x_admin_secret)
+    webhook_payload = PaymentWebhookInput(
+        payment_id=payment_id,
+        status="SUCCESS",
+        provider_ref=payload.provider_ref or f"manual-{secrets.token_hex(6)}",
+        raw_payload={"source": "admin-approve", "note": payload.note or ""},
+    )
+    payment = await handle_payment_status(db, webhook_payload)
+    return {"payment_id": payment.id, "status": payment.status}
+
+
+@app.post("/api/admin/payments/{payment_id}/reject")
+async def api_admin_reject_payment(
+    payment_id: str,
+    payload: AdminPaymentActionInput,
+    x_admin_secret: Optional[str] = Header(default=None, alias="X-Admin-Secret"),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    require_admin_secret(x_admin_secret)
+    webhook_payload = PaymentWebhookInput(
+        payment_id=payment_id,
+        status="FAILED",
+        provider_ref=payload.provider_ref or f"manual-reject-{secrets.token_hex(6)}",
+        raw_payload={"source": "admin-reject", "note": payload.note or ""},
+    )
+    payment = await handle_payment_status(db, webhook_payload)
     return {"payment_id": payment.id, "status": payment.status}
 
 

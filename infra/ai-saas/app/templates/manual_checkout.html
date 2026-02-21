@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <h1>Paiement manuel</h1>
+  <p>ID paiement: <code>{{ payment.id }}</code></p>
+  <p>Plan: <strong>{{ plan.name if plan else payment.plan_id }}</strong></p>
+  <p>Montant: <strong>{{ payment.amount }} {{ payment.currency }}</strong></p>
+  <p>Statut: <strong>{{ payment.status }}</strong></p>
+
+  <div class="manual-instructions">
+    <h3>Instructions</h3>
+    <p>{{ manual_payment_instructions }}</p>
+    <p>Quand le paiement est vérifié côté admin, ton abonnement sera activé automatiquement.</p>
+  </div>
+
+  <a class="ghost" href="/dashboard">Retour dashboard</a>
+</section>
+{% endblock %}
