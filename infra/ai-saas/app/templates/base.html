@@ -8,18 +8,19 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/">{{ app_name }}</a>
+    <a class="brand" href="/">
+      <span class="brand-mark">OI</span>
+      <span>{{ app_name }}</span>
+    </a>
     <nav>
-      <a href="/">Pricing</a>
-      <a href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">Chat IA</a>
+      <a href="/">Accueil</a>
       {% if user %}
       <a href="/dashboard">Dashboard</a>
       <form action="/logout" method="post" class="inline-form">
         <button type="submit" class="link-btn">Logout</button>
       </form>
       {% else %}
-      <a href="/login">Login</a>
-      <a class="pill" href="/signup">Sign up</a>
+      <a class="pill" href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">Login</a>
       {% endif %}
     </nav>
   </header>

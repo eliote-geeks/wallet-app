@@ -7,6 +7,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Optional
+from urllib.parse import quote
 
 import httpx
 from fastapi import (
@@ -58,6 +59,8 @@ class Settings:
         "Envoie le montant par Mobile Money puis partage la reference dans le support.",
     )
     chat_ui_url: str = os.getenv("CHAT_UI_URL", "http://ai-dev.kobo.79.137.32.27.nip.io")
+    whatsapp_number: str = os.getenv("WHATSAPP_NUMBER", "237691754257")
+    contact_email: str = os.getenv("CONTACT_EMAIL", "support@oi.local")
     litellm_url: str = os.getenv("LITELLM_URL", "http://litellm.ai-dev.svc.cluster.local:4000")
     litellm_master_key: str = os.getenv("LITELLM_MASTER_KEY", "")
     default_model: str = os.getenv("DEFAULT_MODEL", "qwen2.5-7b")
@@ -487,15 +490,40 @@ def health() -> dict[str, bool]:
 def home(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     plans = db.scalars(select(Plan).where(Plan.is_active.is_(True)).order_by(Plan.amount.asc())).all()
     user = maybe_current_user(request, db)
+    offers: list[dict[str, Any]] = []
+    for plan in plans:
+        price_value = f"{plan.amount:,}".replace(",", " ")
+        message = (
+            f"Bonjour, je veux souscrire a l'offre {plan.name} "
+            f"({price_value} {plan.currency} / {plan.duration_days} jours)."
+        )
+        offers.append(
+            {
+                "code": plan.code,
+                "name": plan.name,
+                "description": plan.description,
+                "amount": plan.amount,
+                "currency": plan.currency,
+                "duration_days": plan.duration_days,
+                "model_name": plan.model_name,
+                "rpm_limit": plan.rpm_limit,
+                "tpm_limit": plan.tpm_limit,
+                "monthly_budget_usd": plan.monthly_budget_usd,
+                "whatsapp_url": f"https://wa.me/{settings.whatsapp_number}?text={quote(message)}",
+            }
+        )
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "app_name": settings.app_name,
             "plans": plans,
+            "offers": offers,
             "user": user,
             "payment_mode": settings.payment_mode,
             "manual_payment_instructions": settings.manual_payment_instructions,
+            "whatsapp_number": settings.whatsapp_number,
+            "contact_email": settings.contact_email,
         },
     )
 
