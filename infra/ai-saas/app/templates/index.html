@@ -1,71 +1,75 @@
 {% extends "base.html" %}
-{% block body_class %}openwebui-home{% endblock %}
-{% block main_class %}openwebui-main{% endblock %}
+{% block body_class %}landing-body{% endblock %}
 {% block content %}
-{% set model_label = offers[0].model_name if offers else 'qwen2.5-7b' %}
-<section class="ow-shell">
-  <aside class="ow-sidebar fade-up">
-    <a class="ow-brand" href="/">
-      <span class="ow-brand-mark">OI</span>
-      <span>Open WebUI</span>
+<section class="landing-hero fade-up">
+  <p class="landing-chip">OI ASSISTANT</p>
+  <h1>IA moderne, accès simple, expérience pro.</h1>
+  <p class="landing-subtitle">
+    Choisis une formule, ouvre WhatsApp avec ton message pré-rempli, puis connecte-toi.
+    Design sobre, lisible et orienté mobile.
+  </p>
+  <div class="landing-actions">
+    <a class="cta" href="#pricing">Voir les offres</a>
+    <a class="ghost" href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">Login</a>
+  </div>
+</section>
+
+<section id="pricing" class="pricing-head fade-up">
+  <h2>Offres</h2>
+  <p>Plans clairs et activation rapide via WhatsApp.</p>
+</section>
+
+<section class="pricing">
+  {% for offer in offers %}
+  <article class="card offer-card fade-up {% if offer.code == 'PRO' %}offer-card-highlight{% endif %}">
+    <div class="offer-head">
+      <div>
+        <h3>{{ offer.name }}</h3>
+        <p>{{ offer.description }}</p>
+      </div>
+      {% if offer.code == 'PRO' %}<span class="badge">Populaire</span>{% endif %}
+    </div>
+
+    <div class="price-wrap">
+      <div class="price">{{ "{:,.0f}".format(offer.amount).replace(",", " ") }} {{ offer.currency }}</div>
+      <span class="billing">/ {{ offer.duration_days }} jours</span>
+    </div>
+
+    <ul class="offer-meta">
+      <li>Modele: {{ offer.model_name }}</li>
+      <li>Debit: {{ offer.rpm_limit }} req/min</li>
+      <li>Volume: {{ offer.tpm_limit }} tokens/min</li>
+      <li>Budget: {{ offer.monthly_budget_usd }} USD/mois</li>
+    </ul>
+
+    <a class="cta small" href="{{ offer.whatsapp_url }}" target="_blank" rel="noopener noreferrer">
+      Choisir cette offre
     </a>
+  </article>
+  {% endfor %}
+</section>
 
-    <div class="ow-nav-block">
-      <a class="ow-nav-item" href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">Nouvelle conversation</a>
-      <a class="ow-nav-item" href="#pricing">Recherche</a>
-      <a class="ow-nav-item" href="#contact">Notes</a>
-      <a class="ow-nav-item" href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">Espace de travail</a>
-    </div>
-
-    <p class="ow-group-title">Offres</p>
-    <div id="pricing" class="ow-offers-list">
-      {% for offer in offers %}
-      <a class="ow-offer-item" href="{{ offer.whatsapp_url }}" target="_blank" rel="noopener noreferrer">
-        <span>{{ offer.name }}</span>
-        <small>{{ "{:,.0f}".format(offer.amount).replace(",", " ") }} {{ offer.currency }}</small>
-      </a>
-      {% endfor %}
-    </div>
-
-    <div id="contact" class="ow-sidebar-footer">
-      <p>{{ contact_email }}</p>
-      <a href="https://wa.me/{{ whatsapp_number }}" target="_blank" rel="noopener noreferrer">+{{ whatsapp_number }}</a>
-    </div>
-  </aside>
-
-  <section class="ow-main-pane">
-    <header class="ow-topbar fade-up">
-      <div class="ow-model-picker">{{ model_label }} <span>+</span></div>
-      <div class="ow-top-actions">
-        <a class="ow-action" href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">Open WebUI</a>
-      </div>
-    </header>
-
-    <div class="ow-center fade-up">
-      <div class="ow-title-row">
-        <span class="ow-avatar">OI</span>
-        <h1>{{ model_label }}</h1>
-      </div>
-
-      <div class="ow-input-box">
-        <p>Comment puis-je vous aider aujourd'hui ?</p>
-        <div class="ow-input-row">
-          <span>+</span>
-          <span>◈</span>
-          <a href="https://wa.me/{{ whatsapp_number }}" target="_blank" rel="noopener noreferrer">↗</a>
-        </div>
-      </div>
-
-      <div class="ow-suggested">
-        <p class="ow-suggested-title">Suggere</p>
-        {% for offer in offers %}
-        <a class="ow-suggestion" href="{{ offer.whatsapp_url }}" target="_blank" rel="noopener noreferrer">
-          <strong>{{ offer.name }}: {{ "{:,.0f}".format(offer.amount).replace(",", " ") }} {{ offer.currency }}</strong>
-          <span>{{ offer.description }}</span>
-        </a>
-        {% endfor %}
-      </div>
-    </div>
-  </section>
+<section id="contact" class="contact-surface fade-up">
+  <div class="contact-head">
+    <h3>Support</h3>
+    <p>Assistance commerciale et technique.</p>
+  </div>
+  <div class="contact-grid">
+    <a class="contact-card" href="https://wa.me/{{ whatsapp_number }}" target="_blank" rel="noopener noreferrer">
+      <span>WhatsApp</span>
+      <strong>+{{ whatsapp_number }}</strong>
+      <small>Activation et abonnement</small>
+    </a>
+    <a class="contact-card" href="mailto:{{ contact_email }}">
+      <span>Email</span>
+      <strong>{{ contact_email }}</strong>
+      <small>Support technique</small>
+    </a>
+    <a class="contact-card" href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">
+      <span>Chat</span>
+      <strong>Interface IA</strong>
+      <small>Acces direct</small>
+    </a>
+  </div>
 </section>
 {% endblock %}
