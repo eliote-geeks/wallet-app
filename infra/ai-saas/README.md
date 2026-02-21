@@ -1,4 +1,4 @@
-# AI SaaS Portal (separe de Kobo)
+# AI SaaS Portal (separe de l'app principale)
 
 Service SaaS pour vendre des comptes IA:
 - Auth (signup/login)
@@ -8,7 +8,7 @@ Service SaaS pour vendre des comptes IA:
 
 ## Variables d'environnement
 
-- `APP_NAME` (default: `Kobo AI`)
+- `APP_NAME` (default: `OI Assistant`)
 - `APP_URL` (URL publique du portail)
 - `DATABASE_URL` (PostgreSQL SQLAlchemy URL)
 - `JWT_SECRET`

@@ -11,7 +11,7 @@ if ! command -v curl >/dev/null 2>&1; then
   exit 1
 fi
 
-LITELLM_URL="${LITELLM_URL:-http://ai-api-dev.kobo.79.137.32.27.nip.io}"
+LITELLM_URL="${LITELLM_URL:-http://ai-api-dev.79.137.32.27.nip.io}"
 LITELLM_MASTER_KEY="${LITELLM_MASTER_KEY:-}"
 
 usage() {
@@ -21,7 +21,7 @@ LiteLLM account CLI
 Required environment:
   LITELLM_MASTER_KEY=sk-...
 Optional environment:
-  LITELLM_URL=http://ai-api-dev.kobo.79.137.32.27.nip.io
+  LITELLM_URL=http://ai-api-dev.79.137.32.27.nip.io
 
 Commands:
   new-team   --alias NAME [--models m1,m2] [--monthly-budget USD] [--rpm N] [--tpm N]

@@ -1,54 +1,47 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero hero-pro">
-  <div class="hero-copy">
-    <span class="chip">OI Pricing</span>
-    <h1>Choisis une offre et démarre sur WhatsApp</h1>
+<section class="hero">
+  <div class="hero-copy fade-up">
+    <span class="chip">OI ASSISTANT</span>
+    <h1>Une IA claire, rapide et pro.</h1>
     <p>
-      Les comptes sont créés manuellement après confirmation.
-      Clique sur une offre pour envoyer automatiquement la demande avec le prix.
+      Choisis une offre, envoie ta demande sur WhatsApp en un clic, puis connecte-toi.
+      L'interface reste minimaliste et pensée mobile.
     </p>
-
     <div class="hero-actions">
-      <a class="cta" href="https://wa.me/{{ whatsapp_number }}" target="_blank" rel="noopener noreferrer">Contacter WhatsApp</a>
+      <a class="cta" href="#pricing">Voir les offres</a>
       <a class="ghost" href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">Login</a>
     </div>
   </div>
 
-  <div class="hero-side">
-    <div class="stat-grid">
-      <article>
-        <p class="label">Activation</p>
-        <p class="value">Manuelle</p>
-      </article>
-      <article>
-        <p class="label">Canal</p>
-        <p class="value">WhatsApp</p>
-      </article>
-      <article>
-        <p class="label">Support</p>
-        <p class="value">+{{ whatsapp_number }}</p>
-      </article>
-      <article>
-        <p class="label">Connexion</p>
-        <p class="value">Bouton Login</p>
-      </article>
-    </div>
+  <div class="hero-side fade-up">
+    <article>
+      <p class="label">Activation</p>
+      <p class="value">Rapide et manuelle</p>
+    </article>
+    <article>
+      <p class="label">Canal commercial</p>
+      <p class="value">WhatsApp direct</p>
+    </article>
+    <article>
+      <p class="label">Support</p>
+      <p class="value">+{{ whatsapp_number }}</p>
+    </article>
   </div>
 </section>
 
-<section class="pricing-head">
+<section id="pricing" class="pricing-head fade-up">
   <h2>Offres disponibles</h2>
-  <p>Un clic sur une offre ouvre WhatsApp avec ton message pré-rempli.</p>
+  <p>Chaque bouton ouvre WhatsApp avec ton message pré-rempli.</p>
 </section>
 
-<section class="pricing pricing-pro">
+<section class="pricing">
   {% for offer in offers %}
-  <article class="card {% if offer.code == 'PRO' %}card-highlight{% endif %}">
+  <article class="card fade-up {% if offer.code == 'PRO' %}card-highlight{% endif %}">
     {% if offer.code == 'PRO' %}<span class="badge">Top</span>{% endif %}
-    <h2>{{ offer.name }}</h2>
+    <h3>{{ offer.name }}</h3>
     <p>{{ offer.description }}</p>
-    <div class="price">{{ "{:,.0f}".format(offer.amount).replace(",", " ") }} {{ offer.currency }} <span>/ {{ offer.duration_days }}j</span></div>
+    <div class="price">{{ "{:,.0f}".format(offer.amount).replace(",", " ") }} {{ offer.currency }} <span>/ {{ offer.duration_days }} jours</span></div>
     <ul>
       <li>Modèle: {{ offer.model_name }}</li>
       <li>Débit: {{ offer.rpm_limit }} req/min</li>
@@ -57,16 +50,16 @@
     </ul>
 
     <a class="cta small" href="{{ offer.whatsapp_url }}" target="_blank" rel="noopener noreferrer">
-      Choisir via WhatsApp
+      Choisir cette offre
     </a>
   </article>
   {% endfor %}
 </section>
 
-<section class="panel contact-panel">
-  <h3>Coordonnées</h3>
+<section id="contact" class="panel contact-panel fade-up">
+  <h3>Contact</h3>
   <p>WhatsApp: <strong>+{{ whatsapp_number }}</strong></p>
   <p>Email: <strong>{{ contact_email }}</strong></p>
-  <p>Le bouton <strong>Login</strong> en haut ouvre directement l’interface chat.</p>
+  <p>Le bouton <strong>Login</strong> ouvre l'interface chat IA.</p>
 </section>
 {% endblock %}

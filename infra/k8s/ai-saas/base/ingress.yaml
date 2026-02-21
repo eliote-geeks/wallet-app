@@ -8,7 +8,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: ai-portal-dev.kobo.79.137.32.27.nip.io
+    - host: ai-portal-dev.79.137.32.27.nip.io
       http:
         paths:
           - path: /

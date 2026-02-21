@@ -4,8 +4,8 @@ Cette stack déploie une IA self-hosted sur Kubernetes (k3s) avec domaines `nip.
 
 ## Domaines
 
-- UI: `http://ai-dev.kobo.79.137.32.27.nip.io`
-- API Gateway: `http://ai-api-dev.kobo.79.137.32.27.nip.io`
+- UI: `http://ai-dev.79.137.32.27.nip.io`
+- API Gateway: `http://ai-api-dev.79.137.32.27.nip.io`
 
 Note: les certificats Let's Encrypt pour `nip.io` sont bloqués par rate limit global. Utiliser un domaine dédié pour activer TLS fiable en production.
 
@@ -26,13 +26,13 @@ kubectl -n ai-dev get pods
 
 ```bash
 MASTER_KEY="$(kubectl -n ai-dev get secret ai-secrets -o jsonpath='{.data.LITELLM_MASTER_KEY}' | base64 -d)"
-curl -sS http://ai-api-dev.kobo.79.137.32.27.nip.io/v1/models \
+curl -sS http://ai-api-dev.79.137.32.27.nip.io/v1/models \
   -H "Authorization: Bearer ${MASTER_KEY}" | jq
 ```
 
 ## Premier accès UI
 
-1. Ouvrir `http://ai-dev.kobo.79.137.32.27.nip.io`
+1. Ouvrir `http://ai-dev.79.137.32.27.nip.io`
 2. Créer le premier compte admin dans OpenWebUI
 3. Créer ensuite les comptes utilisateurs
 
@@ -45,7 +45,7 @@ Scripts inclus:
 Prérequis:
 ```bash
 sudo apt-get update && sudo apt-get install -y jq curl
-export LITELLM_URL="http://ai-api-dev.kobo.79.137.32.27.nip.io"
+export LITELLM_URL="http://ai-api-dev.79.137.32.27.nip.io"
 export LITELLM_MASTER_KEY="$(kubectl -n ai-dev get secret ai-secrets -o jsonpath='{.data.LITELLM_MASTER_KEY}' | base64 -d)"
 chmod +x infra/k8s/ai/scripts/*.sh
 ```
@@ -62,7 +62,7 @@ Le script de bootstrap est idempotent: il n'ajoute pas de doublons si un plan ex
 ```bash
 infra/k8s/ai/scripts/litellm-account-cli.sh new-user \
   --id user_demo_001 \
-  --email demo1@kobo.ai
+  --email demo1@oi.local
 ```
 
 3. Générer une clé API liée au user:

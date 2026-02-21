@@ -8,7 +8,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: ai-dev.kobo.79.137.32.27.nip.io
+    - host: ai-dev.79.137.32.27.nip.io
       http:
         paths:
           - path: /
@@ -29,7 +29,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: ai-api-dev.kobo.79.137.32.27.nip.io
+    - host: ai-api-dev.79.137.32.27.nip.io
       http:
         paths:
           - path: /

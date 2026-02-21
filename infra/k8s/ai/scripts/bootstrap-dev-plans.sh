@@ -25,19 +25,19 @@ create_if_missing() {
   "${CLI}" new-team --alias "${alias}" "$@" | jq '{team_id: .team_id, team_alias: .team_alias}'
 }
 
-create_if_missing "kobo-basic" \
+create_if_missing "oi-basic" \
   --models "${MODEL}" \
   --monthly-budget 3 \
   --rpm 20 \
   --tpm 40000
 
-create_if_missing "kobo-plus" \
+create_if_missing "oi-plus" \
   --models "${MODEL}" \
   --monthly-budget 10 \
   --rpm 40 \
   --tpm 80000
 
-create_if_missing "kobo-pro" \
+create_if_missing "oi-pro" \
   --models "${MODEL}" \
   --monthly-budget 30 \
   --rpm 80 \

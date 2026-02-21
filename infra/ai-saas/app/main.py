@@ -43,8 +43,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sess
 
 @dataclass
 class Settings:
-    app_name: str = os.getenv("APP_NAME", "Kobo AI")
-    app_url: str = os.getenv("APP_URL", "http://ai-saas-dev.kobo.79.137.32.27.nip.io")
+    app_name: str = os.getenv("APP_NAME", "OI Assistant")
+    app_url: str = os.getenv("APP_URL", "http://ai-portal-dev.79.137.32.27.nip.io")
     database_url: str = os.getenv(
         "DATABASE_URL",
         "postgresql+psycopg2://ai_saas:ai_saas@ai-saas-postgres:5432/ai_saas",
@@ -58,7 +58,7 @@ class Settings:
         "MANUAL_PAYMENT_INSTRUCTIONS",
         "Envoie le montant par Mobile Money puis partage la reference dans le support.",
     )
-    chat_ui_url: str = os.getenv("CHAT_UI_URL", "http://ai-dev.kobo.79.137.32.27.nip.io")
+    chat_ui_url: str = os.getenv("CHAT_UI_URL", "http://ai-dev.79.137.32.27.nip.io")
     whatsapp_number: str = os.getenv("WHATSAPP_NUMBER", "237691754257")
     contact_email: str = os.getenv("CONTACT_EMAIL", "support@oi.local")
     litellm_url: str = os.getenv("LITELLM_URL", "http://litellm.ai-dev.svc.cluster.local:4000")
@@ -274,7 +274,7 @@ def upsert_plans(db: Session) -> None:
             "amount": 2500,
             "currency": "XAF",
             "duration_days": 30,
-            "litellm_team_alias": "kobo-basic",
+            "litellm_team_alias": "oi-basic",
             "model_name": settings.default_model,
             "monthly_budget_usd": 3,
             "rpm_limit": 20,
@@ -287,7 +287,7 @@ def upsert_plans(db: Session) -> None:
             "amount": 7000,
             "currency": "XAF",
             "duration_days": 30,
-            "litellm_team_alias": "kobo-plus",
+            "litellm_team_alias": "oi-plus",
             "model_name": settings.default_model,
             "monthly_budget_usd": 10,
             "rpm_limit": 40,
@@ -300,7 +300,7 @@ def upsert_plans(db: Session) -> None:
             "amount": 20000,
             "currency": "XAF",
             "duration_days": 30,
-            "litellm_team_alias": "kobo-pro",
+            "litellm_team_alias": "oi-pro",
             "model_name": settings.default_model,
             "monthly_budget_usd": 30,
             "rpm_limit": 80,

@@ -1,6 +1,6 @@
 # AI SaaS Portal - Commercial MVP
 
-Ce module est **separe de Kobo**. Il sert a vendre des comptes IA type ChatGPT/Claude.
+Ce module est **separe de l'app principale**. Il sert a vendre des comptes IA type ChatGPT/Claude.
 
 ## Fonctionnalites implementees
 
@@ -31,9 +31,9 @@ Note secrets:
 
 ## URL dev
 
-- Portail SaaS: `http://ai-portal-dev.kobo.79.137.32.27.nip.io`
-- LiteLLM API: `http://ai-api-dev.kobo.79.137.32.27.nip.io`
-- OpenWebUI: `http://ai-dev.kobo.79.137.32.27.nip.io`
+- Portail SaaS: `http://ai-portal-dev.79.137.32.27.nip.io`
+- LiteLLM API: `http://ai-api-dev.79.137.32.27.nip.io`
+- OpenWebUI: `http://ai-dev.79.137.32.27.nip.io`
 
 Note:
 - Le portail SaaS n'est pas le chat lui-meme.
