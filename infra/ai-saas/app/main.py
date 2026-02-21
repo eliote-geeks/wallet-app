@@ -520,6 +520,8 @@ def home(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
             "plans": plans,
             "offers": offers,
             "user": user,
+            "hide_topbar": True,
+            "fluid_layout": True,
             "payment_mode": settings.payment_mode,
             "manual_payment_instructions": settings.manual_payment_instructions,
             "whatsapp_number": settings.whatsapp_number,
