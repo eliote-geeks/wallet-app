@@ -19,6 +19,7 @@ Service SaaS pour vendre des comptes IA:
 - `ADMIN_API_SECRET` (obligatoire pour valider/rejeter paiements manuels)
 - `MANUAL_PAYMENT_INSTRUCTIONS`
 - `CHAT_UI_URL` (lien de l'interface chat, ex OpenWebUI)
+- `CONTACT_EMAIL` (default: `pauleliote97@gmail.com`)
 - `LITELLM_URL` (ex: `http://litellm.ai-dev.svc.cluster.local:4000`)
 - `LITELLM_MASTER_KEY`
 - `DEFAULT_MODEL` (ex: `qwen2.5-7b`)

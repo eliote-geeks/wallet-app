@@ -328,7 +328,7 @@ nav a:hover,
   background: rgba(18, 24, 35, 0.78);
   padding: 12px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
 }
 
@@ -662,6 +662,10 @@ td {
 
 .feature-grid .feature-card:nth-child(4) {
   animation-delay: 0.15s;
+}
+
+.feature-grid .feature-card:nth-child(5) {
+  animation-delay: 0.19s;
 }
 
 .pricing .offer-card:nth-child(1) {

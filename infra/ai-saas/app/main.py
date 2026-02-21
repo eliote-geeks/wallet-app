@@ -60,7 +60,7 @@ class Settings:
     )
     chat_ui_url: str = os.getenv("CHAT_UI_URL", "https://ai-dev.79.137.32.27.nip.io")
     whatsapp_number: str = os.getenv("WHATSAPP_NUMBER", "237691754257")
-    contact_email: str = os.getenv("CONTACT_EMAIL", "support@oi.local")
+    contact_email: str = os.getenv("CONTACT_EMAIL", "pauleliote97@gmail.com")
     litellm_url: str = os.getenv("LITELLM_URL", "http://litellm.ai-dev.svc.cluster.local:4000")
     litellm_master_key: str = os.getenv("LITELLM_MASTER_KEY", "")
     default_model: str = os.getenv("DEFAULT_MODEL", "qwen2.5-7b")
