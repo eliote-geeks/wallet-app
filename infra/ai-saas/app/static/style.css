@@ -22,7 +22,7 @@ body {
 }
 
 body {
-  font-family: "Inter", "Segoe UI", sans-serif;
+  font-family: "Plus Jakarta Sans", "Inter", "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
 }
@@ -201,8 +201,8 @@ nav a:hover,
 .pricing {
   margin-top: 18px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
 }
 
 .card,
@@ -213,10 +213,10 @@ nav a:hover,
 }
 
 .card {
-  padding: 16px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  min-height: 360px;
+  min-height: 300px;
   transition: border-color 0.16s ease, transform 0.16s ease;
 }
 
@@ -243,19 +243,19 @@ nav a:hover,
 .card h3,
 .card h2 {
   margin: 0;
-  font-size: 21px;
+  font-size: 19px;
   font-weight: 600;
 }
 
 .card p {
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .price {
-  margin: 14px 0 8px;
-  font-size: 34px;
+  margin: 10px 0 6px;
+  font-size: 29px;
   font-weight: 600;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -268,11 +268,11 @@ nav a:hover,
 }
 
 .card ul {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   padding-left: 18px;
   color: var(--muted);
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .panel {
