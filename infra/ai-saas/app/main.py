@@ -44,7 +44,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sess
 @dataclass
 class Settings:
     app_name: str = os.getenv("APP_NAME", "OI Assistant")
-    app_url: str = os.getenv("APP_URL", "http://ai-portal-dev.79.137.32.27.nip.io")
+    app_url: str = os.getenv("APP_URL", "https://ai-portal-dev.79.137.32.27.nip.io")
     database_url: str = os.getenv(
         "DATABASE_URL",
         "postgresql+psycopg2://ai_saas:ai_saas@ai-saas-postgres:5432/ai_saas",
@@ -58,7 +58,7 @@ class Settings:
         "MANUAL_PAYMENT_INSTRUCTIONS",
         "Envoie le montant par Mobile Money puis partage la reference dans le support.",
     )
-    chat_ui_url: str = os.getenv("CHAT_UI_URL", "http://ai-dev.79.137.32.27.nip.io")
+    chat_ui_url: str = os.getenv("CHAT_UI_URL", "https://ai-dev.79.137.32.27.nip.io")
     whatsapp_number: str = os.getenv("WHATSAPP_NUMBER", "237691754257")
     contact_email: str = os.getenv("CONTACT_EMAIL", "support@oi.local")
     litellm_url: str = os.getenv("LITELLM_URL", "http://litellm.ai-dev.svc.cluster.local:4000")

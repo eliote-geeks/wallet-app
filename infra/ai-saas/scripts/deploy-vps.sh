@@ -7,7 +7,7 @@ set -euo pipefail
 HOST="${HOST:-79.137.32.27}"
 DEPLOY_USER="${DEPLOY_USER:-${USER:-ubuntu}}"
 IMAGE="ai-saas-portal:dev-local"
-APP_URL="${APP_URL:-http://ai-portal-dev.${HOST}.nip.io}"
+APP_URL="${APP_URL:-https://ai-portal-dev.${HOST}.nip.io}"
 REMOTE_APP_DIR="/tmp/ai-saas-src"
 REMOTE_K8S_DIR="/tmp/ai-saas-k8s"
 REMOTE_OUT_FILE="/tmp/ai-saas-secrets.out"
