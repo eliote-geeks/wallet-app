@@ -4,9 +4,14 @@ metadata:
   name: ai-saas-portal
   namespace: ai-saas-dev
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: web
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
 spec:
   ingressClassName: traefik
+  tls:
+    - hosts:
+        - ai-portal-dev.79.137.32.27.nip.io
+      secretName: ai-portal-dev-tls
   rules:
     - host: ai-portal-dev.79.137.32.27.nip.io
       http:

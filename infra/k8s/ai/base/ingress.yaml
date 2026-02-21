@@ -4,9 +4,14 @@ metadata:
   name: ai-openwebui
   namespace: ai-dev
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: web
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
 spec:
   ingressClassName: traefik
+  tls:
+    - hosts:
+        - ai-dev.79.137.32.27.nip.io
+      secretName: ai-dev-tls
   rules:
     - host: ai-dev.79.137.32.27.nip.io
       http:
@@ -25,9 +30,14 @@ metadata:
   name: ai-litellm
   namespace: ai-dev
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: web
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
 spec:
   ingressClassName: traefik
+  tls:
+    - hosts:
+        - ai-api-dev.79.137.32.27.nip.io
+      secretName: ai-api-dev-tls
   rules:
     - host: ai-api-dev.79.137.32.27.nip.io
       http:
