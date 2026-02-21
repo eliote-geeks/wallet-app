@@ -8,4 +8,6 @@ resources:
   - postgres-statefulset.yaml
   - app-service.yaml
   - app-deployment.yaml
+  - frontend-service.yaml
+  - frontend-deployment.yaml
   - ingress.yaml

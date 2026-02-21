@@ -16,10 +16,38 @@ spec:
     - host: ai-portal-dev.79.137.32.27.nip.io
       http:
         paths:
-          - path: /
+          - path: /api
             pathType: Prefix
             backend:
               service:
                 name: ai-saas-portal
+                port:
+                  number: 80
+          - path: /checkout/manual
+            pathType: Prefix
+            backend:
+              service:
+                name: ai-saas-portal
+                port:
+                  number: 80
+          - path: /checkout/mock
+            pathType: Prefix
+            backend:
+              service:
+                name: ai-saas-portal
+                port:
+                  number: 80
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: ai-saas-portal
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ai-saas-frontend
                 port:
                   number: 80
