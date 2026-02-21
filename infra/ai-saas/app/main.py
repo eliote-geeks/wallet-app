@@ -43,7 +43,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sess
 
 @dataclass
 class Settings:
-    app_name: str = os.getenv("APP_NAME", "OI Assistant")
+    app_name: str = os.getenv("APP_NAME", "Father Paul Assistant")
     app_url: str = os.getenv("APP_URL", "https://ai-portal-dev.79.137.32.27.nip.io")
     database_url: str = os.getenv(
         "DATABASE_URL",

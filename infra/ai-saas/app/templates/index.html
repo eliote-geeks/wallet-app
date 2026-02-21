@@ -1,22 +1,78 @@
 {% extends "base.html" %}
 {% block body_class %}landing-body{% endblock %}
 {% block content %}
-<section class="landing-hero fade-up">
-  <p class="landing-chip">OI ASSISTANT</p>
-  <h1>IA moderne, accès simple, expérience pro.</h1>
-  <p class="landing-subtitle">
-    Choisis une formule, ouvre WhatsApp avec ton message pré-rempli, puis connecte-toi.
-    Design sobre, lisible et orienté mobile.
-  </p>
-  <div class="landing-actions">
-    <a class="cta" href="#pricing">Voir les offres</a>
-    <a class="ghost" href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">Login</a>
+<section class="hero-shell fade-up">
+  <div class="hero-copy">
+    <p class="landing-chip">FATHER PAUL ASSISTANT</p>
+    <h1>Une plateforme IA premium pour tes usages quotidiens.</h1>
+    <p class="landing-subtitle">
+      Design moderne, activation rapide, et accès immédiat à l'interface de chat.
+      Une expérience propre, pensée pour mobile et desktop.
+    </p>
+    <div class="landing-actions">
+      <a class="cta" href="#pricing">Voir les offres</a>
+      <a class="ghost" href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">Login</a>
+    </div>
+  </div>
+  <aside class="hero-stats">
+    <div class="stats-head">
+      <span>Portail IA</span>
+      <strong>Father Paul Assistant</strong>
+    </div>
+    <div class="stats-grid">
+      <div class="mini-stat">
+        <span>Modèle</span>
+        <strong>qwen2.5-7b</strong>
+      </div>
+      <div class="mini-stat">
+        <span>Activation</span>
+        <strong>WhatsApp</strong>
+      </div>
+      <div class="mini-stat">
+        <span>Accès</span>
+        <strong>24h/24</strong>
+      </div>
+      <div class="mini-stat">
+        <span>Support</span>
+        <strong>Direct</strong>
+      </div>
+    </div>
+  </aside>
+</section>
+
+<section class="trust-strip fade-up">
+  <span>Inspiré des standards UI des plateformes IA modernes</span>
+  <div class="trust-logos">
+    <span>OpenAI</span>
+    <span>Anthropic</span>
+    <span>Perplexity</span>
+    <span>Notion AI</span>
   </div>
 </section>
 
+<section class="feature-grid fade-up">
+  <article class="feature-card">
+    <h3>Interface claire</h3>
+    <p>Typographie compacte et lisible, hiérarchie nette.</p>
+  </article>
+  <article class="feature-card">
+    <h3>Parcours rapide</h3>
+    <p>Choix d'offre, contact WhatsApp, activation immédiate.</p>
+  </article>
+  <article class="feature-card">
+    <h3>Prêt à monétiser</h3>
+    <p>Plans simples, modèle économique direct et compréhensible.</p>
+  </article>
+  <article class="feature-card">
+    <h3>Expérience premium</h3>
+    <p>Animations légères et rendu moderne sans surcharge.</p>
+  </article>
+  <div class="feature-line"></div>
+</section>
+
 <section id="pricing" class="pricing-head fade-up">
-  <h2>Offres</h2>
-  <p>Plans clairs et activation rapide via WhatsApp.</p>
+  <h2>Tarifs</h2>
+  <p>Choisis une offre et contacte-moi sur WhatsApp pour l'activation.</p>
 </section>
 
 <section class="pricing">
@@ -27,7 +83,7 @@
         <h3>{{ offer.name }}</h3>
         <p>{{ offer.description }}</p>
       </div>
-      {% if offer.code == 'PRO' %}<span class="badge">Populaire</span>{% endif %}
+      {% if offer.code == 'PRO' %}<span class="badge">Recommandé</span>{% endif %}
     </div>
 
     <div class="price-wrap">
@@ -36,8 +92,8 @@
     </div>
 
     <ul class="offer-meta">
-      <li>Modele: {{ offer.model_name }}</li>
-      <li>Debit: {{ offer.rpm_limit }} req/min</li>
+      <li>Modèle: {{ offer.model_name }}</li>
+      <li>Débit: {{ offer.rpm_limit }} req/min</li>
       <li>Volume: {{ offer.tpm_limit }} tokens/min</li>
       <li>Budget: {{ offer.monthly_budget_usd }} USD/mois</li>
     </ul>
@@ -51,24 +107,24 @@
 
 <section id="contact" class="contact-surface fade-up">
   <div class="contact-head">
-    <h3>Support</h3>
-    <p>Assistance commerciale et technique.</p>
+    <h3>Contact</h3>
+    <p>Pour l'abonnement, le support ou l'activation.</p>
   </div>
   <div class="contact-grid">
     <a class="contact-card" href="https://wa.me/{{ whatsapp_number }}" target="_blank" rel="noopener noreferrer">
       <span>WhatsApp</span>
       <strong>+{{ whatsapp_number }}</strong>
-      <small>Activation et abonnement</small>
+      <small>Abonnements et activation</small>
     </a>
     <a class="contact-card" href="mailto:{{ contact_email }}">
       <span>Email</span>
       <strong>{{ contact_email }}</strong>
-      <small>Support technique</small>
+      <small>Support technique et commercial</small>
     </a>
     <a class="contact-card" href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">
       <span>Chat</span>
-      <strong>Interface IA</strong>
-      <small>Acces direct</small>
+      <strong>Espace Assistant</strong>
+      <small>Connexion à la plateforme</small>
     </a>
   </div>
 </section>

@@ -26,7 +26,7 @@ spec:
               name: http
           env:
             - name: APP_NAME
-              value: "OI Assistant"
+              value: "Father Paul Assistant"
             - name: APP_URL
               value: "https://ai-portal-dev.79.137.32.27.nip.io"
             - name: DATABASE_URL
