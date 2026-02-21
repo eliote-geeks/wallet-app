@@ -20,28 +20,54 @@
 <section class="pricing">
   {% for offer in offers %}
   <article class="card fade-up {% if offer.code == 'PRO' %}card-highlight{% endif %}">
-    {% if offer.code == 'PRO' %}<span class="badge">Top</span>{% endif %}
-    <h3>{{ offer.name }}</h3>
-    <p>{{ offer.description }}</p>
-    <div class="price">{{ "{:,.0f}".format(offer.amount).replace(",", " ") }} {{ offer.currency }} <span>/ {{ offer.duration_days }} jours</span></div>
-    <ul>
+    <div class="card-head">
+      <div>
+        <h3>{{ offer.name }}</h3>
+        <p>{{ offer.description }}</p>
+      </div>
+      {% if offer.code == 'PRO' %}<span class="badge">Populaire</span>{% endif %}
+    </div>
+    <div class="price-wrap">
+      <div class="price">{{ "{:,.0f}".format(offer.amount).replace(",", " ") }} {{ offer.currency }}</div>
+      <span class="billing">/ {{ offer.duration_days }} jours</span>
+    </div>
+    <ul class="feature-list">
       <li>Modèle: {{ offer.model_name }}</li>
       <li>Débit: {{ offer.rpm_limit }} req/min</li>
       <li>Volume: {{ offer.tpm_limit }} tokens/min</li>
       <li>Budget: {{ offer.monthly_budget_usd }} USD/mois</li>
     </ul>
 
-    <a class="cta small" href="{{ offer.whatsapp_url }}" target="_blank" rel="noopener noreferrer">
-      Choisir cette offre
-    </a>
+    <div class="card-footer">
+      <a class="cta small" href="{{ offer.whatsapp_url }}" target="_blank" rel="noopener noreferrer">
+        Choisir cette offre
+      </a>
+    </div>
   </article>
   {% endfor %}
 </section>
 
-<section id="contact" class="panel contact-panel fade-up">
-  <h3>Contact</h3>
-  <p>WhatsApp: <strong>+{{ whatsapp_number }}</strong></p>
-  <p>Email: <strong>{{ contact_email }}</strong></p>
-  <p>Le bouton <strong>Login</strong> en haut ouvre l'interface chat.</p>
+<section id="contact" class="contact-surface fade-up">
+  <div class="contact-header">
+    <h3>Support & activation</h3>
+    <p>Activation manuelle après validation. Réponse rapide en journée.</p>
+  </div>
+  <div class="contact-grid">
+    <a class="contact-tile" href="https://wa.me/{{ whatsapp_number }}" target="_blank" rel="noopener noreferrer">
+      <span class="contact-label">WhatsApp</span>
+      <strong>+{{ whatsapp_number }}</strong>
+      <small>Demande commerciale</small>
+    </a>
+    <a class="contact-tile" href="mailto:{{ contact_email }}">
+      <span class="contact-label">Email</span>
+      <strong>{{ contact_email }}</strong>
+      <small>Support technique</small>
+    </a>
+    <a class="contact-tile" href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">
+      <span class="contact-label">Chat</span>
+      <strong>Ouvrir l'interface</strong>
+      <small>Connexion immédiate</small>
+    </a>
+  </div>
 </section>
 {% endblock %}
