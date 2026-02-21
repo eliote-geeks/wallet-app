@@ -22,6 +22,7 @@
     <p>Pas encore generee. Choisis un plan et paie pour l'activer.</p>
     {% endif %}
     <p>Endpoint API: <code>{{ api_url }}/v1/chat/completions</code></p>
+    <p><a class="cta small" href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">Ouvrir l'interface Chat IA</a></p>
     {% if payment_mode == 'manual' %}
     <div class="manual-instructions">
       <strong>Instructions paiement manuel:</strong>

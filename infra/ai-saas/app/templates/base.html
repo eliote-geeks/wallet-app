@@ -11,6 +11,7 @@
     <a class="brand" href="/">{{ app_name }}</a>
     <nav>
       <a href="/">Pricing</a>
+      <a href="{{ chat_ui_url }}" target="_blank" rel="noopener noreferrer">Chat IA</a>
       {% if user %}
       <a href="/dashboard">Dashboard</a>
       <form action="/logout" method="post" class="inline-form">

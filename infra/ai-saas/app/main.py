@@ -57,6 +57,7 @@ class Settings:
         "MANUAL_PAYMENT_INSTRUCTIONS",
         "Envoie le montant par Mobile Money puis partage la reference dans le support.",
     )
+    chat_ui_url: str = os.getenv("CHAT_UI_URL", "http://ai-dev.kobo.79.137.32.27.nip.io")
     litellm_url: str = os.getenv("LITELLM_URL", "http://litellm.ai-dev.svc.cluster.local:4000")
     litellm_master_key: str = os.getenv("LITELLM_MASTER_KEY", "")
     default_model: str = os.getenv("DEFAULT_MODEL", "qwen2.5-7b")
@@ -144,6 +145,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 app = FastAPI(title="AI SaaS Portal", version="0.1.0")
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
+templates.env.globals["chat_ui_url"] = settings.chat_ui_url
 
 
 class SignupInput(BaseModel):

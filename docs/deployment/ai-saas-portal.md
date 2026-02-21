@@ -35,6 +35,10 @@ Note secrets:
 - LiteLLM API: `http://ai-api-dev.kobo.79.137.32.27.nip.io`
 - OpenWebUI: `http://ai-dev.kobo.79.137.32.27.nip.io`
 
+Note:
+- Le portail SaaS n'est pas le chat lui-meme.
+- Le chat est accessible via OpenWebUI (menu `Chat IA` dans le portail).
+
 ## Flux utilisateur (sans API paiement)
 
 1. User cree son compte sur le portail.

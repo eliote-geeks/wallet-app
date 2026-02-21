@@ -53,6 +53,8 @@ spec:
               value: "manual"
             - name: MANUAL_PAYMENT_INSTRUCTIONS
               value: "Transfere le montant via Mobile Money, puis envoie la reference au support pour activation."
+            - name: CHAT_UI_URL
+              value: "http://ai-dev.kobo.79.137.32.27.nip.io"
             - name: LITELLM_URL
               value: "http://litellm.ai-dev.svc.cluster.local:4000"
             - name: LITELLM_MASTER_KEY
