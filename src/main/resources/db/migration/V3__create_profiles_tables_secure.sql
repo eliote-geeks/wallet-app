@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     user_id UUID UNIQUE NOT NULL,
     name VARCHAR(200) NOT NULL,
     about TEXT,
-    photo_url VARCHAR(1000),
+    avatar_media_id UUID,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL
 );

@@ -1,0 +1,19 @@
+# Notifications Module Configuration
+
+# OneSignal Push (used by @Value in OneSignalPushProvider)
+notifications:
+  onesignal:
+    app-id: ${ONESIGNAL_APP_ID:}
+    api-key: ${ONESIGNAL_API_KEY:}
+
+  # Africa's Talking SMS (used by @Value in AfricasTalkingSmsProvider)
+  africastalking:
+    username: ${AT_USERNAME:sandbox}
+    api-key: ${AT_API_KEY:}
+    sandbox: ${AT_SANDBOX:true}
+
+  # Retry config (used by NotificationProperties)
+  retry:
+    push-max-attempts: 3
+    sms-max-attempts: 2
+    initial-delay-ms: 60000

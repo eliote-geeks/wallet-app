@@ -3,6 +3,7 @@ package com.socialwallet.profiles.service;
 import com.socialwallet.profiles.dto.*;
 import com.socialwallet.profiles.model.*;
 import com.socialwallet.profiles.repository.*;
+import com.socialwallet.media.service.MediaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ public class ProfileService {
     private final ContactRepository contactRepository;
     private final BlockRepository blockRepository;
     private final UserSettingsRepository settingsRepository;
+    private final MediaService mediaService;
 
     @Transactional(readOnly = true)
     public MyProfileDto getMyProfile(UUID userId) {
@@ -31,7 +33,8 @@ public class ProfileService {
         dto.setUserId(profile.getUserId());
         dto.setName(profile.getName());
         dto.setAbout(profile.getAbout());
-        dto.setPhotoUrl(profile.getPhotoUrl());
+        dto.setAvatarMediaId(profile.getAvatarMediaId());
+        dto.setPhotoUrl(resolveAvatarUrl(profile.getAvatarMediaId()));
         return dto;
     }
 
@@ -39,7 +42,7 @@ public class ProfileService {
     public ProfileDto getProfileForViewer(UUID viewerId, UUID targetId) {
         Profile profile = getProfileEntity(targetId);
         UserSettings settings = getSettings(targetId);
-        boolean isMutualContact = isMutualContact(viewerId, targetId);  // ← RENOMMÉ pour clarté
+        boolean isMutualContact = isMutualContact(viewerId, targetId);
 
         ProfileDto dto = new ProfileDto();
         dto.setUserId(profile.getUserId());
@@ -48,7 +51,7 @@ public class ProfileService {
         // Photo visible si EVERYONE OU (MY_CONTACTS et contact mutuel)
         if (settings.getProfilePhoto() == PrivacyLevel.EVERYONE ||
             (settings.getProfilePhoto() == PrivacyLevel.MY_CONTACTS && isMutualContact)) {
-            dto.setPhotoUrl(profile.getPhotoUrl());
+            dto.setPhotoUrl(resolveAvatarUrl(profile.getAvatarMediaId()));
         }
 
         // About visible si EVERYONE OU (MY_CONTACTS et contact mutuel)
@@ -69,8 +72,11 @@ public class ProfileService {
         if (updated.getAbout() != null) {
             profile.setAbout(updated.getAbout().trim());
         }
-        if (updated.getPhotoUrl() != null) {
-            profile.setPhotoUrl(updated.getPhotoUrl());
+        if (updated.getAvatarMediaId() != null) {
+            if (!mediaService.exists(updated.getAvatarMediaId())) {
+                throw new IllegalArgumentException("Avatar media not found");
+            }
+            profile.setAvatarMediaId(updated.getAvatarMediaId());
         }
         profileRepository.save(profile);
     }
@@ -87,7 +93,7 @@ public class ProfileService {
         }
 
         if (contactRepository.findByUserIdAndContactId(userId, contactId).isPresent()) {
-            return; // Idempotent
+            return;
         }
 
         contactRepository.save(createContact(userId, contactId));
@@ -105,7 +111,7 @@ public class ProfileService {
         }
 
         if (blockRepository.findByBlockerIdAndBlockedId(blockerId, blockedId).isPresent()) {
-            return; // Idempotent
+            return;
         }
 
         blockRepository.save(createBlock(blockerId, blockedId));
@@ -139,12 +145,6 @@ public class ProfileService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Checks if a user with the given userId exists in the system.
-     *
-     * @param userId the UUID to check
-     * @return true if the user exists (has a profile), false otherwise
-     */
     @Transactional(readOnly = true)
     public boolean existsByUserId(UUID userId) {
         return profileRepository.existsByUserId(userId);
@@ -167,6 +167,25 @@ public class ProfileService {
         settingsRepository.save(settings);
     }
 
+    // ──────────────────────────────────────────────
+    // PRIVATE HELPERS
+    // ──────────────────────────────────────────────
+
+    /**
+     * Resolves the avatar display URL from the Media module.
+     * Returns null if no avatar is set.
+     */
+    private String resolveAvatarUrl(UUID avatarMediaId) {
+        if (avatarMediaId == null) {
+            return null;
+        }
+        try {
+            return mediaService.getDisplayUrl(avatarMediaId, 150, 150);
+        } catch (Exception e) {
+            return null; // Media deleted or expired — return no avatar
+        }
+    }
+
     private Profile getProfileEntity(UUID userId) {
         return profileRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Profile not found"));
@@ -177,18 +196,10 @@ public class ProfileService {
                 .orElseGet(() -> createDefaultSettings(userId));
     }
 
-    /**
-     * Checks if two users are MUTUAL contacts.
-     * Returns true ONLY if BOTH users have added each other.
-     * 
-     * @param userId1 First user ID
-     * @param userId2 Second user ID
-     * @return true if both have added each other, false otherwise
-     */
     private boolean isMutualContact(UUID userId1, UUID userId2) {
         boolean user1HasUser2 = contactRepository.findByUserIdAndContactId(userId1, userId2).isPresent();
         boolean user2HasUser1 = contactRepository.findByUserIdAndContactId(userId2, userId1).isPresent();
-        return user1HasUser2 && user2HasUser1;  // ← LES DEUX doivent être vrais
+        return user1HasUser2 && user2HasUser1;
     }
 
     private Contact createContact(UUID userId, UUID contactId) {

@@ -17,25 +17,42 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
-        format_sql: true
+        "[format_sql]": true
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
   security:
     oauth2:
       resourceserver:
         jwt:
-          # Issuer URI de ton realm Keycloak local
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8082/realms/social-wallet}
 
 # Ajouts spécifiques pour Keycloak / JWT
 app:
   security:
-    # JWK set URI pour récupérer la clé publique
     jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak:8080/realms/social-wallet/protocol/openid-connect/certs}
-    # Liste des issuers autorisés (utile pour dev Docker et localhost)
     allowed-issuers:
       - ${KEYCLOAK_ISSUER_EXTERNAL:http://localhost:8082/realms/social-wallet}
       - ${KEYCLOAK_ISSUER_INTERNAL:http://keycloak:8080/realms/social-wallet}
+
+# Media module configuration
+media:
+  max-uploads-per-hour: 30
+  soft-delete-grace-days: 30
+  storage:
+    bucket: ${DO_SPACES_BUCKET:sw-media}
+    region: ${DO_SPACES_REGION:fra1}
+    endpoint: ${DO_SPACES_ENDPOINT:https://fra1.digitaloceanspaces.com}
+    access-key: ${DO_SPACES_ACCESS_KEY:}
+    secret-key: ${DO_SPACES_SECRET_KEY:}
+  imgproxy:
+    base-url: ${IMGPROXY_BASE_URL:http://localhost:8081}
+    key: ${IMGPROXY_KEY:}
+    salt: ${IMGPROXY_SALT:}
+    url-expiration-seconds: 3600
 
 management:
   endpoints:
@@ -45,4 +62,4 @@ management:
 
 logging:
   level:
-    org.springframework.security: INFO
+    "[org.springframework.security]": INFO

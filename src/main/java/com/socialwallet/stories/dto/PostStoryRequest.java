@@ -13,7 +13,7 @@ public class PostStoryRequest {
     @NotNull(message = "Media type is required")
     private MediaType mediaType;
 
-    private String mediaUrl;        // Required for IMAGE/VIDEO
+    private UUID mediaId;           // Required for IMAGE/VIDEO (reference to Media module)
     private String caption;         // Optional for IMAGE/VIDEO
     private String textContent;     // Required for TEXT
     private String backgroundColor; // Required for TEXT

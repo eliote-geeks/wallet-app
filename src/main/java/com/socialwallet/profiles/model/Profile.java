@@ -23,10 +23,15 @@ public class Profile {
     private String name;
 
     @Column(length = 500)
-    private String about;  // "About" status
+    private String about;
 
-    @Column(name = "photo_url", length = 1000)
-    private String photoUrl;
+    /**
+     * Reference to the avatar media asset managed by the Media module.
+     * Replaces the former photoUrl field.
+     * Null means no avatar set (use default).
+     */
+    @Column(name = "avatar_media_id")
+    private UUID avatarMediaId;
 
     private Instant createdAt;
 

@@ -1,5 +1,6 @@
 package com.socialwallet.stories.service;
 
+import com.socialwallet.media.service.MediaService;
 import com.socialwallet.profiles.model.Contact;
 import com.socialwallet.profiles.model.PrivacyLevel;
 import com.socialwallet.profiles.model.Profile;
@@ -46,12 +47,14 @@ class StoryServiceTest {
     @Mock private BlockRepository blockRepository;
     @Mock private StoryHiddenFromRepository hiddenFromRepository;
     @Mock private StorySharedWithRepository sharedWithRepository;
+    @Mock private MediaService mediaService;
 
     @InjectMocks private StoryService storyService;
 
     private final UUID authorId = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private final UUID viewerId = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private final UUID storyId = UUID.fromString("00000000-0000-0000-0000-000000000099");
+    private final UUID mediaId = UUID.fromString("00000000-0000-0000-0000-000000000050");
 
     private UserSettings createDefaultSettings(UUID userId) {
         UserSettings settings = new UserSettings();
@@ -65,7 +68,7 @@ class StoryServiceTest {
         story.setId(storyId);
         story.setAuthorId(authorId);
         story.setMediaType(MediaType.IMAGE);
-        story.setMediaUrl("https://cdn.example.com/photo.jpg");
+        story.setMediaId(mediaId);
         story.setCaption("Beautiful sunset");
         story.setVisibility(visibility);
         story.setCreatedAt(LocalDateTime.now());
@@ -78,12 +81,15 @@ class StoryServiceTest {
     class StoryCreation {
 
         @Test
-        @DisplayName("createStory with IMAGE type succeeds with valid mediaUrl")
+        @DisplayName("createStory with IMAGE type succeeds with valid mediaId")
         void createStory_imageType_succeeds() {
             PostStoryRequest request = new PostStoryRequest();
             request.setMediaType(MediaType.IMAGE);
-            request.setMediaUrl("https://cdn.example.com/photo.jpg");
+            request.setMediaId(mediaId);
             request.setCaption("Test caption");
+
+            when(mediaService.exists(mediaId)).thenReturn(true);
+            when(mediaService.getDisplayUrl(mediaId)).thenReturn("https://cdn.test/image.jpg");
 
             UserSettings settings = createDefaultSettings(authorId);
             when(userSettingsRepository.findByUserId(authorId)).thenReturn(Optional.of(settings));
@@ -99,7 +105,7 @@ class StoryServiceTest {
 
             assertNotNull(result);
             assertEquals(MediaType.IMAGE, result.getMediaType());
-            assertEquals("https://cdn.example.com/photo.jpg", result.getMediaUrl());
+            assertEquals(mediaId, result.getMediaId());
             assertEquals("Test caption", result.getCaption());
             verify(storyRepository).save(any(Story.class));
         }
@@ -130,13 +136,24 @@ class StoryServiceTest {
         }
 
         @Test
-        @DisplayName("createStory throws when IMAGE has no mediaUrl")
-        void createStory_imageWithoutUrl_throws() {
+        @DisplayName("createStory throws when IMAGE has no mediaId")
+        void createStory_imageWithoutMediaId_throws() {
             PostStoryRequest request = new PostStoryRequest();
             request.setMediaType(MediaType.IMAGE);
 
-            UserSettings settings = createDefaultSettings(authorId);
-            lenient().when(userSettingsRepository.findByUserId(authorId)).thenReturn(Optional.of(settings));
+            assertThrows(IllegalArgumentException.class, () ->
+                storyService.createStory(authorId, request)
+            );
+        }
+
+        @Test
+        @DisplayName("createStory throws when mediaId does not exist")
+        void createStory_mediaNotFound_throws() {
+            PostStoryRequest request = new PostStoryRequest();
+            request.setMediaType(MediaType.IMAGE);
+            request.setMediaId(mediaId);
+
+            when(mediaService.exists(mediaId)).thenReturn(false);
 
             assertThrows(IllegalArgumentException.class, () ->
                 storyService.createStory(authorId, request)
@@ -150,9 +167,6 @@ class StoryServiceTest {
             request.setMediaType(MediaType.TEXT);
             request.setBackgroundColor("#FF5733");
 
-            UserSettings settings = createDefaultSettings(authorId);
-            lenient().when(userSettingsRepository.findByUserId(authorId)).thenReturn(Optional.of(settings));
-
             assertThrows(IllegalArgumentException.class, () ->
                 storyService.createStory(authorId, request)
             );
@@ -163,8 +177,10 @@ class StoryServiceTest {
         void createStory_usesDefaultVisibility() {
             PostStoryRequest request = new PostStoryRequest();
             request.setMediaType(MediaType.IMAGE);
-            request.setMediaUrl("https://cdn.example.com/photo.jpg");
-            // No visibility specified
+            request.setMediaId(mediaId);
+
+            when(mediaService.exists(mediaId)).thenReturn(true);
+            lenient().when(mediaService.getDisplayUrl(mediaId)).thenReturn("https://cdn.test/image.jpg");
 
             UserSettings settings = createDefaultSettings(authorId);
             settings.setDefaultStoryVisibility(PrivacyLevel.EVERYONE);
@@ -187,7 +203,9 @@ class StoryServiceTest {
         void createStory_visibilityNobody_throws() {
             PostStoryRequest request = new PostStoryRequest();
             request.setMediaType(MediaType.IMAGE);
-            request.setMediaUrl("https://cdn.example.com/photo.jpg");
+            request.setMediaId(mediaId);
+
+            when(mediaService.exists(mediaId)).thenReturn(true);
 
             UserSettings settings = createDefaultSettings(authorId);
             settings.setDefaultStoryVisibility(PrivacyLevel.NOBODY);
@@ -208,10 +226,11 @@ class StoryServiceTest {
         void getMyActiveStories_returnsActiveStories() {
             Story story1 = createImageStory(authorId, PrivacyLevel.MY_CONTACTS);
             Story story2 = createImageStory(authorId, PrivacyLevel.MY_CONTACTS);
-            
+
             when(storyRepository.findByAuthorIdAndExpiresAtAfterOrderByCreatedAtDesc(eq(authorId), any()))
                 .thenReturn(List.of(story1, story2));
             when(storyViewRepository.countByStoryId(any())).thenReturn(5L);
+            lenient().when(mediaService.getDisplayUrl(mediaId)).thenReturn("https://cdn.test/image.jpg");
 
             List<StoryDto> results = storyService.getMyActiveStories(authorId);
 
@@ -234,19 +253,15 @@ class StoryServiceTest {
         @DisplayName("getStory throws when viewer not authorized (not mutual contact)")
         void getStory_notAuthorized_throws() {
             Story story = createImageStory(authorId, PrivacyLevel.MY_CONTACTS);
-            
+
             when(storyRepository.findByIdAndExpiresAtAfter(eq(storyId), any()))
                 .thenReturn(Optional.of(story));
-            
-            // Not mutual contact (only one direction)
             when(contactRepository.findByUserIdAndContactId(viewerId, authorId))
                 .thenReturn(Optional.empty());
             when(contactRepository.findByUserIdAndContactId(authorId, viewerId))
                 .thenReturn(Optional.empty());
-            
             when(blockRepository.findByBlockerIdAndBlockedId(any(), any()))
                 .thenReturn(Optional.empty());
-            
             when(sharedWithRepository.findByStoryId(storyId))
                 .thenReturn(Collections.emptyList());
             when(hiddenFromRepository.findByStoryId(storyId))
@@ -261,25 +276,22 @@ class StoryServiceTest {
         @DisplayName("getStory succeeds when viewer is mutual contact")
         void getStory_mutualContact_succeeds() {
             Story story = createImageStory(authorId, PrivacyLevel.MY_CONTACTS);
-            
+
             when(storyRepository.findByIdAndExpiresAtAfter(eq(storyId), any()))
                 .thenReturn(Optional.of(story));
-            
-            // Mock BOTH directions for mutual contact
             when(contactRepository.findByUserIdAndContactId(viewerId, authorId))
                 .thenReturn(Optional.of(new Contact()));
             when(contactRepository.findByUserIdAndContactId(authorId, viewerId))
                 .thenReturn(Optional.of(new Contact()));
-            
             when(blockRepository.findByBlockerIdAndBlockedId(any(), any()))
                 .thenReturn(Optional.empty());
             when(storyViewRepository.findByStoryIdAndViewerId(storyId, viewerId))
                 .thenReturn(Optional.empty());
-            
             when(sharedWithRepository.findByStoryId(storyId))
                 .thenReturn(Collections.emptyList());
             when(hiddenFromRepository.findByStoryId(storyId))
                 .thenReturn(Collections.emptyList());
+            lenient().when(mediaService.getDisplayUrl(mediaId)).thenReturn("https://cdn.test/image.jpg");
 
             StoryDto result = storyService.getStory(viewerId, storyId);
 
@@ -296,21 +308,17 @@ class StoryServiceTest {
         @DisplayName("markAsViewed creates view when not already viewed")
         void markAsViewed_createsView() {
             Story story = createImageStory(authorId, PrivacyLevel.MY_CONTACTS);
-            
+
             when(storyRepository.findByIdAndExpiresAtAfter(eq(storyId), any()))
                 .thenReturn(Optional.of(story));
-            
-            // Mock BOTH directions for mutual contact
             when(contactRepository.findByUserIdAndContactId(viewerId, authorId))
                 .thenReturn(Optional.of(new Contact()));
             when(contactRepository.findByUserIdAndContactId(authorId, viewerId))
                 .thenReturn(Optional.of(new Contact()));
-            
             when(blockRepository.findByBlockerIdAndBlockedId(any(), any()))
                 .thenReturn(Optional.empty());
             when(storyViewRepository.findByStoryIdAndViewerId(storyId, viewerId))
                 .thenReturn(Optional.empty());
-            
             when(sharedWithRepository.findByStoryId(storyId))
                 .thenReturn(Collections.emptyList());
             when(hiddenFromRepository.findByStoryId(storyId))
@@ -326,21 +334,17 @@ class StoryServiceTest {
         void markAsViewed_isIdempotent() {
             Story story = createImageStory(authorId, PrivacyLevel.MY_CONTACTS);
             com.socialwallet.stories.model.StoryView existingView = new com.socialwallet.stories.model.StoryView();
-            
+
             when(storyRepository.findByIdAndExpiresAtAfter(eq(storyId), any()))
                 .thenReturn(Optional.of(story));
-            
-            // Mock BOTH directions for mutual contact
             when(contactRepository.findByUserIdAndContactId(viewerId, authorId))
                 .thenReturn(Optional.of(new Contact()));
             when(contactRepository.findByUserIdAndContactId(authorId, viewerId))
                 .thenReturn(Optional.of(new Contact()));
-            
             when(blockRepository.findByBlockerIdAndBlockedId(any(), any()))
                 .thenReturn(Optional.empty());
             when(storyViewRepository.findByStoryIdAndViewerId(storyId, viewerId))
                 .thenReturn(Optional.of(existingView));
-            
             when(sharedWithRepository.findByStoryId(storyId))
                 .thenReturn(Collections.emptyList());
             when(hiddenFromRepository.findByStoryId(storyId))
@@ -355,7 +359,7 @@ class StoryServiceTest {
         @DisplayName("markAsViewed does not record view for author viewing own story")
         void markAsViewed_authorOwnStory_noRecord() {
             Story story = createImageStory(authorId, PrivacyLevel.MY_CONTACTS);
-            
+
             when(storyRepository.findByIdAndExpiresAtAfter(eq(storyId), any()))
                 .thenReturn(Optional.of(story));
 
@@ -373,7 +377,7 @@ class StoryServiceTest {
         @DisplayName("deleteStory succeeds when author deletes own story")
         void deleteStory_authorDeletes_succeeds() {
             Story story = createImageStory(authorId, PrivacyLevel.MY_CONTACTS);
-            
+
             when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
 
             storyService.deleteStory(authorId, storyId);
@@ -388,7 +392,7 @@ class StoryServiceTest {
         @DisplayName("deleteStory throws when non-author tries to delete")
         void deleteStory_nonAuthor_throws() {
             Story story = createImageStory(authorId, PrivacyLevel.MY_CONTACTS);
-            
+
             when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
 
             assertThrows(IllegalArgumentException.class, () ->
@@ -405,15 +409,15 @@ class StoryServiceTest {
         @DisplayName("getStoryViewers returns all viewers for author")
         void getStoryViewers_author_returnsViewers() {
             Story story = createImageStory(authorId, PrivacyLevel.MY_CONTACTS);
-            
+
             com.socialwallet.stories.model.StoryView view1 = new com.socialwallet.stories.model.StoryView();
             view1.setViewerId(viewerId);
             view1.setViewedAt(LocalDateTime.now());
-            
+
             Profile viewerProfile = new Profile();
             viewerProfile.setUserId(viewerId);
             viewerProfile.setName("Viewer");
-            
+
             when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
             when(storyViewRepository.findByStoryIdOrderByViewedAtDesc(storyId))
                 .thenReturn(List.of(view1));
@@ -431,7 +435,7 @@ class StoryServiceTest {
         @DisplayName("getStoryViewers throws when non-author tries to access")
         void getStoryViewers_nonAuthor_throws() {
             Story story = createImageStory(authorId, PrivacyLevel.MY_CONTACTS);
-            
+
             when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
 
             assertThrows(IllegalArgumentException.class, () ->

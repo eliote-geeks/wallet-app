@@ -23,8 +23,12 @@ public class Story {
     @Column(name = "media_type", nullable = false)
     private MediaType mediaType;
 
-    @Column(name = "media_url", length = 1000)
-    private String mediaUrl;
+    /**
+     * Reference to the media asset managed by the Media module.
+     * Required for IMAGE/VIDEO stories. Null for TEXT stories.
+     */
+    @Column(name = "media_id")
+    private UUID mediaId;
 
     @Column(name = "caption", columnDefinition = "TEXT")
     private String caption;

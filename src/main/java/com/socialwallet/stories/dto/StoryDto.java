@@ -12,7 +12,8 @@ public class StoryDto {
     private UUID storyId;
     private UUID authorId;
     private MediaType mediaType;
-    private String mediaUrl;
+    private UUID mediaId;       // Stored reference
+    private String mediaUrl;    // Resolved display URL (read-only)
     private String caption;
     private String textContent;
     private String backgroundColor;

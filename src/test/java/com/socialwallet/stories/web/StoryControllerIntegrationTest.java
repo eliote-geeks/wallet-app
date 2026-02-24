@@ -1,6 +1,10 @@
 package com.socialwallet.stories.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.socialwallet.media.model.MediaAsset;
+import com.socialwallet.media.model.MediaPurpose;
+import com.socialwallet.media.model.MediaStatus;
+import com.socialwallet.media.repository.MediaAssetRepository;
 import com.socialwallet.profiles.model.Contact;
 import com.socialwallet.profiles.model.PrivacyLevel;
 import com.socialwallet.profiles.model.Profile;
@@ -23,42 +27,26 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/**
- * Comprehensive integration tests for StoryController.
- * Uses H2 in-memory database.
- * Simulates authenticated user with @WithMockUser.
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("StoryController - Integration Tests")
 class StoryControllerIntegrationTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private StoryRepository storyRepository;
-
-    @Autowired
-    private StoryViewRepository storyViewRepository;
-
-    @Autowired
-    private ProfileRepository profileRepository;
-
-    @Autowired
-    private UserSettingsRepository userSettingsRepository;
-
-    @Autowired
-    private ContactRepository contactRepository;
+    @Autowired private MockMvc mockMvc;
+    @Autowired private ObjectMapper objectMapper;
+    @Autowired private StoryRepository storyRepository;
+    @Autowired private StoryViewRepository storyViewRepository;
+    @Autowired private ProfileRepository profileRepository;
+    @Autowired private UserSettingsRepository userSettingsRepository;
+    @Autowired private ContactRepository contactRepository;
+    @Autowired private MediaAssetRepository mediaAssetRepository;
 
     private final UUID authenticatedUserId = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private final UUID contactUserId = UUID.fromString("22222222-2222-2222-2222-222222222222");
@@ -70,6 +58,7 @@ class StoryControllerIntegrationTest {
         contactRepository.deleteAll();
         userSettingsRepository.deleteAll();
         profileRepository.deleteAll();
+        mediaAssetRepository.deleteAll();
     }
 
     private Profile createAndSaveProfile(UUID userId, String name) {
@@ -77,7 +66,6 @@ class StoryControllerIntegrationTest {
         p.setUserId(userId);
         p.setName(name);
         p.setAbout("Test about");
-        p.setPhotoUrl("photo.jpg");
         return profileRepository.save(p);
     }
 
@@ -92,11 +80,28 @@ class StoryControllerIntegrationTest {
         return userSettingsRepository.save(s);
     }
 
-    private Story createAndSaveStory(UUID authorId, com.socialwallet.stories.model.MediaType mediaType) {
+    /**
+     * Creates a media asset in the database to use as story media reference.
+     */
+    private MediaAsset createAndSaveMedia(UUID uploaderId) {
+        MediaAsset asset = MediaAsset.builder()
+                .uploaderId(uploaderId)
+                .purpose(MediaPurpose.STORY)
+                .originalFilename("story-photo.jpg")
+                .mimeType("image/jpeg")
+                .sizeBytes(2048L)
+                .storagePath("story/" + uploaderId + "/" + UUID.randomUUID() + ".jpg")
+                .status(MediaStatus.UPLOADED)
+                .createdAt(Instant.now())
+                .build();
+        return mediaAssetRepository.save(asset);
+    }
+
+    private Story createAndSaveStory(UUID authorId, com.socialwallet.stories.model.MediaType mediaType, UUID mediaId) {
         Story s = new Story();
         s.setAuthorId(authorId);
         s.setMediaType(mediaType);
-        s.setMediaUrl(mediaType == com.socialwallet.stories.model.MediaType.IMAGE ? "https://cdn.example.com/photo.jpg" : null);
+        s.setMediaId(mediaType == com.socialwallet.stories.model.MediaType.IMAGE ? mediaId : null);
         s.setTextContent(mediaType == com.socialwallet.stories.model.MediaType.TEXT ? "Hello" : null);
         s.setBackgroundColor(mediaType == com.socialwallet.stories.model.MediaType.TEXT ? "#FF5733" : null);
         s.setVisibility(PrivacyLevel.MY_CONTACTS);
@@ -143,10 +148,11 @@ class StoryControllerIntegrationTest {
         void createStory_image_succeeds() throws Exception {
             createAndSaveProfile(authenticatedUserId, "Me");
             createAndSaveSettings(authenticatedUserId);
+            MediaAsset media = createAndSaveMedia(authenticatedUserId);
 
             PostStoryRequest request = new PostStoryRequest();
             request.setMediaType(com.socialwallet.stories.model.MediaType.IMAGE);
-            request.setMediaUrl("https://cdn.example.com/photo.jpg");
+            request.setMediaId(media.getId());
             request.setCaption("Sunset");
 
             mockMvc.perform(post("/api/stories")
@@ -154,7 +160,7 @@ class StoryControllerIntegrationTest {
                     .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.mediaType").value("IMAGE"))
-                .andExpect(jsonPath("$.mediaUrl").value("https://cdn.example.com/photo.jpg"))
+                .andExpect(jsonPath("$.mediaId").value(media.getId().toString()))
                 .andExpect(jsonPath("$.caption").value("Sunset"));
         }
 
@@ -179,8 +185,8 @@ class StoryControllerIntegrationTest {
         }
 
         @Test
-        @DisplayName("POST / returns 400 when IMAGE has no mediaUrl")
-        void createStory_imageWithoutUrl_returns400() throws Exception {
+        @DisplayName("POST / returns 400 when IMAGE has no mediaId")
+        void createStory_imageWithoutMediaId_returns400() throws Exception {
             createAndSaveProfile(authenticatedUserId, "Me");
             createAndSaveSettings(authenticatedUserId);
 
@@ -204,8 +210,9 @@ class StoryControllerIntegrationTest {
         void getMyStories_returnsActiveStories() throws Exception {
             createAndSaveProfile(authenticatedUserId, "Me");
             createAndSaveSettings(authenticatedUserId);
-            createAndSaveStory(authenticatedUserId, com.socialwallet.stories.model.MediaType.IMAGE);
-            createAndSaveStory(authenticatedUserId, com.socialwallet.stories.model.MediaType.TEXT);
+            MediaAsset media = createAndSaveMedia(authenticatedUserId);
+            createAndSaveStory(authenticatedUserId, com.socialwallet.stories.model.MediaType.IMAGE, media.getId());
+            createAndSaveStory(authenticatedUserId, com.socialwallet.stories.model.MediaType.TEXT, null);
 
             mockMvc.perform(get("/api/stories/me"))
                 .andExpect(status().isOk())
@@ -221,7 +228,8 @@ class StoryControllerIntegrationTest {
             createAndSaveSettings(authenticatedUserId);
             createAndSaveSettings(contactUserId);
             createMutualContact(authenticatedUserId, contactUserId);
-            createAndSaveStory(contactUserId, com.socialwallet.stories.model.MediaType.IMAGE);
+            MediaAsset media = createAndSaveMedia(contactUserId);
+            createAndSaveStory(contactUserId, com.socialwallet.stories.model.MediaType.IMAGE, media.getId());
 
             mockMvc.perform(get("/api/stories/contacts"))
                 .andExpect(status().isOk())
@@ -237,7 +245,8 @@ class StoryControllerIntegrationTest {
             createAndSaveProfile(contactUserId, "Contact");
             createAndSaveSettings(authenticatedUserId);
             createMutualContact(authenticatedUserId, contactUserId);
-            Story story = createAndSaveStory(contactUserId, com.socialwallet.stories.model.MediaType.IMAGE);
+            MediaAsset media = createAndSaveMedia(contactUserId);
+            Story story = createAndSaveStory(contactUserId, com.socialwallet.stories.model.MediaType.IMAGE, media.getId());
 
             mockMvc.perform(get("/api/stories/" + story.getId()))
                 .andExpect(status().isOk())
@@ -250,8 +259,8 @@ class StoryControllerIntegrationTest {
             createAndSaveProfile(authenticatedUserId, "Me");
             createAndSaveProfile(contactUserId, "Contact");
             createAndSaveSettings(authenticatedUserId);
-            // No mutual contact
-            Story story = createAndSaveStory(contactUserId, com.socialwallet.stories.model.MediaType.IMAGE);
+            MediaAsset media = createAndSaveMedia(contactUserId);
+            Story story = createAndSaveStory(contactUserId, com.socialwallet.stories.model.MediaType.IMAGE, media.getId());
 
             mockMvc.perform(get("/api/stories/" + story.getId()))
                 .andExpect(status().isBadRequest());
@@ -270,12 +279,12 @@ class StoryControllerIntegrationTest {
             createAndSaveProfile(contactUserId, "Contact");
             createAndSaveSettings(authenticatedUserId);
             createMutualContact(authenticatedUserId, contactUserId);
-            Story story = createAndSaveStory(contactUserId, com.socialwallet.stories.model.MediaType.IMAGE);
+            MediaAsset media = createAndSaveMedia(contactUserId);
+            Story story = createAndSaveStory(contactUserId, com.socialwallet.stories.model.MediaType.IMAGE, media.getId());
 
             mockMvc.perform(post("/api/stories/" + story.getId() + "/view"))
                 .andExpect(status().isNoContent());
 
-            // Verify view was recorded
             mockMvc.perform(get("/api/stories/" + story.getId()))
                 .andExpect(jsonPath("$.viewedByMe").value(true));
         }
@@ -291,12 +300,12 @@ class StoryControllerIntegrationTest {
         void deleteStory_ownStory_succeeds() throws Exception {
             createAndSaveProfile(authenticatedUserId, "Me");
             createAndSaveSettings(authenticatedUserId);
-            Story story = createAndSaveStory(authenticatedUserId, com.socialwallet.stories.model.MediaType.IMAGE);
+            MediaAsset media = createAndSaveMedia(authenticatedUserId);
+            Story story = createAndSaveStory(authenticatedUserId, com.socialwallet.stories.model.MediaType.IMAGE, media.getId());
 
             mockMvc.perform(delete("/api/stories/" + story.getId()))
                 .andExpect(status().isNoContent());
 
-            // Verify story deleted
             mockMvc.perform(get("/api/stories/me"))
                 .andExpect(jsonPath("$.length()").value(0));
         }
@@ -307,7 +316,8 @@ class StoryControllerIntegrationTest {
             createAndSaveProfile(authenticatedUserId, "Me");
             createAndSaveProfile(contactUserId, "Contact");
             createAndSaveSettings(authenticatedUserId);
-            Story story = createAndSaveStory(contactUserId, com.socialwallet.stories.model.MediaType.IMAGE);
+            MediaAsset media = createAndSaveMedia(contactUserId);
+            Story story = createAndSaveStory(contactUserId, com.socialwallet.stories.model.MediaType.IMAGE, media.getId());
 
             mockMvc.perform(delete("/api/stories/" + story.getId()))
                 .andExpect(status().isBadRequest());
@@ -324,7 +334,8 @@ class StoryControllerIntegrationTest {
         void getViewers_ownStory_succeeds() throws Exception {
             createAndSaveProfile(authenticatedUserId, "Me");
             createAndSaveSettings(authenticatedUserId);
-            Story story = createAndSaveStory(authenticatedUserId, com.socialwallet.stories.model.MediaType.IMAGE);
+            MediaAsset media = createAndSaveMedia(authenticatedUserId);
+            Story story = createAndSaveStory(authenticatedUserId, com.socialwallet.stories.model.MediaType.IMAGE, media.getId());
 
             mockMvc.perform(get("/api/stories/" + story.getId() + "/viewers"))
                 .andExpect(status().isOk())
@@ -337,7 +348,8 @@ class StoryControllerIntegrationTest {
             createAndSaveProfile(authenticatedUserId, "Me");
             createAndSaveProfile(contactUserId, "Contact");
             createAndSaveSettings(authenticatedUserId);
-            Story story = createAndSaveStory(contactUserId, com.socialwallet.stories.model.MediaType.IMAGE);
+            MediaAsset media = createAndSaveMedia(contactUserId);
+            Story story = createAndSaveStory(contactUserId, com.socialwallet.stories.model.MediaType.IMAGE, media.getId());
 
             mockMvc.perform(get("/api/stories/" + story.getId() + "/viewers"))
                 .andExpect(status().isBadRequest());
