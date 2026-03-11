@@ -1,5 +1,6 @@
 package com.socialwallet.profiles.service;
 
+import com.socialwallet.media.service.MediaService;
 import com.socialwallet.profiles.dto.MyProfileDto;
 import com.socialwallet.profiles.dto.ProfileDto;
 import com.socialwallet.profiles.dto.UserSettingsDto;
@@ -19,6 +20,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,6 +31,7 @@ class ProfileServiceTest {
     @Mock private ContactRepository contactRepository;
     @Mock private BlockRepository blockRepository;
     @Mock private UserSettingsRepository settingsRepository;
+    @Mock private MediaService mediaService;
 
     @InjectMocks private ProfileService profileService;
 
@@ -36,13 +39,14 @@ class ProfileServiceTest {
     private final UUID contactId = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private final UUID targetId = UUID.fromString("00000000-0000-0000-0000-000000000003");
     private final UUID viewerId = UUID.fromString("00000000-0000-0000-0000-000000000004");
+    private final UUID avatarMediaId = UUID.fromString("00000000-0000-0000-0000-000000000050");
 
     private Profile createTestProfile() {
         Profile p = new Profile();
         p.setUserId(targetId);
         p.setName("Test User");
         p.setAbout("Visible bio");
-        p.setPhotoUrl("photo.jpg");
+        p.setAvatarMediaId(avatarMediaId);
         return p;
     }
 
@@ -62,18 +66,21 @@ class ProfileServiceTest {
     class ProfileRetrieval {
 
         @Test
-        @DisplayName("getMyProfile returns complete profile")
+        @DisplayName("getMyProfile returns complete profile with resolved avatar URL")
         void getMyProfile_returnsCompleteProfile() {
             Profile profile = createTestProfile();
             profile.setUserId(userId);
             when(profileRepository.findByUserId(userId)).thenReturn(Optional.of(profile));
+            when(mediaService.getDisplayUrl(avatarMediaId, 150, 150))
+                    .thenReturn("https://cdn.test/avatar.jpg");
 
             MyProfileDto result = profileService.getMyProfile(userId);
 
             assertEquals(userId, result.getUserId());
             assertEquals("Test User", result.getName());
             assertEquals("Visible bio", result.getAbout());
-            assertEquals("photo.jpg", result.getPhotoUrl());
+            assertEquals(avatarMediaId, result.getAvatarMediaId());
+            assertEquals("https://cdn.test/avatar.jpg", result.getPhotoUrl());
         }
 
         @Test
@@ -94,11 +101,13 @@ class ProfileServiceTest {
 
             when(profileRepository.findByUserId(targetId)).thenReturn(Optional.of(profile));
             when(settingsRepository.findByUserId(targetId)).thenReturn(Optional.of(settings));
+            when(mediaService.getDisplayUrl(avatarMediaId, 150, 150))
+                    .thenReturn("https://cdn.test/avatar.jpg");
 
             ProfileDto result = profileService.getProfileForViewer(viewerId, targetId);
 
             assertEquals("Visible bio", result.getAbout());
-            assertEquals("photo.jpg", result.getPhotoUrl());
+            assertEquals("https://cdn.test/avatar.jpg", result.getPhotoUrl());
         }
 
         @Test
@@ -111,17 +120,17 @@ class ProfileServiceTest {
 
             when(profileRepository.findByUserId(targetId)).thenReturn(Optional.of(profile));
             when(settingsRepository.findByUserId(targetId)).thenReturn(Optional.of(settings));
-            
-            // Mock BOTH directions for mutual contact
             when(contactRepository.findByUserIdAndContactId(viewerId, targetId))
                 .thenReturn(Optional.of(new Contact()));
             when(contactRepository.findByUserIdAndContactId(targetId, viewerId))
                 .thenReturn(Optional.of(new Contact()));
+            when(mediaService.getDisplayUrl(avatarMediaId, 150, 150))
+                    .thenReturn("https://cdn.test/avatar.jpg");
 
             ProfileDto result = profileService.getProfileForViewer(viewerId, targetId);
 
             assertEquals("Visible bio", result.getAbout());
-            assertEquals("photo.jpg", result.getPhotoUrl());
+            assertEquals("https://cdn.test/avatar.jpg", result.getPhotoUrl());
         }
 
         @Test
@@ -134,8 +143,6 @@ class ProfileServiceTest {
 
             when(profileRepository.findByUserId(targetId)).thenReturn(Optional.of(profile));
             when(settingsRepository.findByUserId(targetId)).thenReturn(Optional.of(settings));
-            
-            // Only ONE direction - not mutual
             when(contactRepository.findByUserIdAndContactId(viewerId, targetId))
                 .thenReturn(Optional.of(new Contact()));
             when(contactRepository.findByUserIdAndContactId(targetId, viewerId))
@@ -347,20 +354,14 @@ class ProfileServiceTest {
         @DisplayName("existsByUserId returns true when user exists")
         void existsByUserId_returnsTrueWhenExists() {
             when(profileRepository.existsByUserId(userId)).thenReturn(true);
-
-            boolean result = profileService.existsByUserId(userId);
-
-            assertTrue(result);
+            assertTrue(profileService.existsByUserId(userId));
         }
 
         @Test
         @DisplayName("existsByUserId returns false when user does not exist")
         void existsByUserId_returnsFalseWhenNotExists() {
             when(profileRepository.existsByUserId(userId)).thenReturn(false);
-
-            boolean result = profileService.existsByUserId(userId);
-
-            assertFalse(result);
+            assertFalse(profileService.existsByUserId(userId));
         }
     }
 }

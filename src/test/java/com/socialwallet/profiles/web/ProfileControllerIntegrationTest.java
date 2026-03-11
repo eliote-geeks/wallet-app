@@ -1,9 +1,6 @@
 package com.socialwallet.profiles.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-// import com.socialwallet.profiles.dto.ContactDto;
-// import com.socialwallet.profiles.dto.MyProfileDto;
-// import com.socialwallet.profiles.dto.ProfileDto;
 import com.socialwallet.profiles.dto.UserSettingsDto;
 import com.socialwallet.profiles.model.PrivacyLevel;
 import com.socialwallet.profiles.model.Profile;
@@ -21,67 +18,47 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.ActiveProfiles;
 
-// import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/**
- * Comprehensive integration tests for ProfileController.
- * 
- * Uses H2 in-memory database.
- * Simulates authenticated user with @WithMockUser (username = userId as string).
- * Principal.getName() is used in the controller to extract userId.
- */
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 @DisplayName("ProfileController - Integration Tests")
 class ProfileControllerIntegrationTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private ProfileRepository profileRepository;
-
-    @Autowired
-    private UserSettingsRepository settingsRepository;
-
-    @Autowired
-    private BlockRepository blockRepository;
-
-    @Autowired
-    private ContactRepository contactRepository;
+    @Autowired private MockMvc mockMvc;
+    @Autowired private ObjectMapper objectMapper;
+    @Autowired private ProfileRepository profileRepository;
+    @Autowired private UserSettingsRepository settingsRepository;
+    @Autowired private BlockRepository blockRepository;
+    @Autowired private ContactRepository contactRepository;
 
     private final UUID authenticatedUserId = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private final UUID otherUserId = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
     @BeforeEach
     void setUp() {
-        // Clean all relevant tables before each test
         blockRepository.deleteAll();
         contactRepository.deleteAll();
         profileRepository.deleteAll();
         settingsRepository.deleteAll();
     }
 
-    // Helper to create and save a profile
-    private Profile createAndSaveProfile(UUID userId, String name, String about, String photo) {
+    private Profile createAndSaveProfile(UUID userId, String name, String about) {
         Profile p = new Profile();
         p.setUserId(userId);
         p.setName(name);
         p.setAbout(about);
-        p.setPhotoUrl(photo);
         return profileRepository.save(p);
     }
 
-    // Helper to create and save settings
     private UserSettings createAndSaveSettings(UUID userId, PrivacyLevel photo, PrivacyLevel about) {
         UserSettings s = new UserSettings();
         s.setUserId(userId);
@@ -113,27 +90,26 @@ class ProfileControllerIntegrationTest {
     }
 
     @Nested
-    @WithMockUser(username = "11111111-1111-1111-1111-111111111111")  // Simulates authenticated user
+    @WithMockUser(username = "11111111-1111-1111-1111-111111111111")
     @DisplayName("Happy Path Tests with Authentication")
     class HappyPath {
 
         @Test
         @DisplayName("GET /me returns full profile for owner")
         void getMyProfile_returnsFullProfile() throws Exception {
-            createAndSaveProfile(authenticatedUserId, "Me", "My status", "my-photo.jpg");
+            createAndSaveProfile(authenticatedUserId, "Me", "My status");
 
             mockMvc.perform(get("/api/profiles/me"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.userId").value(authenticatedUserId.toString()))
                     .andExpect(jsonPath("$.name").value("Me"))
-                    .andExpect(jsonPath("$.about").value("My status"))
-                    .andExpect(jsonPath("$.photoUrl").value("my-photo.jpg"));
+                    .andExpect(jsonPath("$.about").value("My status"));
         }
 
         @Test
         @DisplayName("GET /{targetId} applies visibility rules correctly")
         void getOtherProfile_appliesVisibility() throws Exception {
-            createAndSaveProfile(otherUserId, "Other", "Hidden status", "hidden-photo.jpg");
+            createAndSaveProfile(otherUserId, "Other", "Hidden status");
             createAndSaveSettings(otherUserId, PrivacyLevel.MY_CONTACTS, PrivacyLevel.MY_CONTACTS);
 
             mockMvc.perform(get("/api/profiles/" + otherUserId))
@@ -219,8 +195,7 @@ class ProfileControllerIntegrationTest {
         @Test
         @DisplayName("GET /exists/{existingId} returns 200 OK")
         void checkUserExists_existing_returnsOk() throws Exception {
-            // Create the profile first so it exists
-            createAndSaveProfile(authenticatedUserId, "Test User", "Test about", "test.jpg");
+            createAndSaveProfile(authenticatedUserId, "Test User", "Test about");
 
             mockMvc.perform(get("/api/profiles/exists/" + authenticatedUserId))
                     .andExpect(status().isOk());

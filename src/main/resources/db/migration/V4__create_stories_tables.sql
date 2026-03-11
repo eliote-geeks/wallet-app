@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS stories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     author_id UUID NOT NULL,
     media_type VARCHAR(20) NOT NULL CHECK (media_type IN ('IMAGE', 'VIDEO', 'TEXT')),
-    media_url VARCHAR(1000),
+    media_id UUID,
     caption TEXT,
     text_content TEXT,
     background_color VARCHAR(10),

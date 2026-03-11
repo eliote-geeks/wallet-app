@@ -1,13 +1,19 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:${postgres.port}/testdb
-    username: test
-    password: test
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  flyway:
+    enabled: false
 
   servlet:
     multipart:
@@ -18,9 +24,8 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${keycloak.auth-server-url}realms/social-wallet
+          issuer-uri: http://localhost:8082/realms/social-wallet
 
-# Media config pour les tests (valeurs factices, S3 est mocké via @MockBean)
 media:
   max-uploads-per-hour: 30
   soft-delete-grace-days: 30

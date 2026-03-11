@@ -44,10 +44,10 @@ media:
   soft-delete-grace-days: 30
   storage:
     bucket: ${DO_SPACES_BUCKET:sw-media}
-    region: ${DO_SPACES_REGION:fra1}
-    endpoint: ${DO_SPACES_ENDPOINT:https://fra1.digitaloceanspaces.com}
-    access-key: ${DO_SPACES_ACCESS_KEY:}
-    secret-key: ${DO_SPACES_SECRET_KEY:}
+    region: ${DO_SPACES_REGION:us-east-1}
+    endpoint: ${DO_SPACES_ENDPOINT:http://localhost:9000}
+    access-key: ${DO_SPACES_ACCESS_KEY:minioadmin}
+    secret-key: ${DO_SPACES_SECRET_KEY:minioadmin}
   imgproxy:
     base-url: ${IMGPROXY_BASE_URL:http://localhost:8081}
     key: ${IMGPROXY_KEY:}

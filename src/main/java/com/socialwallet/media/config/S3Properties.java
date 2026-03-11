@@ -12,8 +12,8 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "media.storage")
 public class S3Properties {
     private String bucket = "sw-media";
-    private String region = "fra1";
-    private String endpoint = "https://fra1.digitaloceanspaces.com";
-    private String accessKey;
-    private String secretKey;
+    private String region = "us-east-1";
+    private String endpoint = "http://localhost:9000";
+    private String accessKey = "minioadmin";
+    private String secretKey = "minioadmin";
 }

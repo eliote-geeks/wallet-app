@@ -22,6 +22,35 @@ services:
     ports:
       - "8082:8080"
 
+  minio:
+    image: minio/minio
+    container_name: social-wallet-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+
+  imgproxy:
+    image: darthsim/imgproxy:latest
+    container_name: social-wallet-imgproxy
+    ports:
+      - "8081:8080"
+    environment:
+      IMGPROXY_KEY: ${IMGPROXY_KEY}
+      IMGPROXY_SALT: ${IMGPROXY_SALT}
+      IMGPROXY_USE_S3: "true"
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_REGION: us-east-1
+      IMGPROXY_S3_ENDPOINT: http://minio:9000
+    depends_on:
+      - minio
+
   app:
     build: .
     container_name: social-wallet-api
@@ -30,11 +59,22 @@ services:
       DB_USER: social_wallet
       DB_PASSWORD: change_me
       KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/social-wallet
+      DO_SPACES_ENDPOINT: http://minio:9000
+      DO_SPACES_ACCESS_KEY: minioadmin
+      DO_SPACES_SECRET_KEY: minioadmin
+      DO_SPACES_BUCKET: sw-media
+      DO_SPACES_REGION: us-east-1
+      IMGPROXY_BASE_URL: http://imgproxy:8080
+      IMGPROXY_KEY: ${IMGPROXY_KEY}
+      IMGPROXY_SALT: ${IMGPROXY_SALT}
     depends_on:
       - db
       - keycloak
+      - minio
+      - imgproxy
     ports:
       - "8080:8080"
 
 volumes:
   db-data:
+  minio-data:

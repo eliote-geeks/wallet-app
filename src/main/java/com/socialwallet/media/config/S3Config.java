@@ -7,12 +7,13 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.net.URI;
 
 /**
- * Creates the S3Client and S3Presigner beans for DigitalOcean Spaces (or any S3-compatible provider).
+ * Creates the S3Client and S3Presigner beans for S3-compatible storage (MinIO, DigitalOcean Spaces, AWS S3).
  */
 @Configuration
 @RequiredArgsConstructor
@@ -46,6 +47,11 @@ public class S3Config {
                                 s3Properties.getSecretKey()
                         )
                 ))
+                .serviceConfiguration(
+                        S3Configuration.builder()
+                                .pathStyleAccessEnabled(true)
+                                .build()
+                )
                 .build();
     }
 }

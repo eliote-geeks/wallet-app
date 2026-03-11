@@ -21,11 +21,6 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-/**
- * Unit tests for ProfileCreationListener.
- * 
- * Ensures that profile and default settings are created on first successful login.
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ProfileCreationListener - Unit Tests")
 class ProfileCreationListenerTest {
@@ -54,12 +49,12 @@ class ProfileCreationListenerTest {
 
         listener.onAuthenticationSuccess(new AuthenticationSuccessEvent(authentication));
 
-        // Verify profile creation
+        // Verify profile creation — avatarMediaId is null by default
         verify(profileRepository).save(argThat(profile ->
                 profile.getUserId().equals(userId) &&
                 profile.getName().equals("John Doe") &&
                 profile.getAbout().isEmpty() &&
-                profile.getPhotoUrl().isEmpty()
+                profile.getAvatarMediaId() == null
         ));
 
         // Verify settings creation with defaults
