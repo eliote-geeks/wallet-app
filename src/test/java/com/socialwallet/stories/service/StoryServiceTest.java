@@ -399,6 +399,40 @@ class StoryServiceTest {
                 storyService.deleteStory(viewerId, storyId)
             );
         }
+
+        @Test
+        @DisplayName("moderatorDeleteStory removes story without author constraint")
+        void moderatorDeleteStory_succeeds() {
+            Story story = createImageStory(authorId, PrivacyLevel.MY_CONTACTS);
+            UUID moderatorId = UUID.fromString("00000000-0000-0000-0000-000000000010");
+
+            when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+
+            storyService.moderatorDeleteStory(storyId, moderatorId);
+
+            verify(hiddenFromRepository).deleteByStoryId(storyId);
+            verify(sharedWithRepository).deleteByStoryId(storyId);
+            verify(storyViewRepository).deleteByStoryId(storyId);
+            verify(storyRepository).delete(story);
+        }
+
+        @Test
+        @DisplayName("moderatorHideStory expires the story immediately")
+        void moderatorHideStory_setsExpiryNow() {
+            Story story = createImageStory(authorId, PrivacyLevel.MY_CONTACTS);
+            UUID moderatorId = UUID.fromString("00000000-0000-0000-0000-000000000010");
+            LocalDateTime now = LocalDateTime.now();
+
+            when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+            when(storyRepository.save(any(Story.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            Story result = storyService.moderatorHideStory(storyId, moderatorId);
+
+            assertNotNull(result);
+            assertNotNull(result.getExpiresAt());
+            assertFalse(result.getExpiresAt().isAfter(now.plusSeconds(1)));
+            verify(storyRepository).save(story);
+        }
     }
 
     @Nested

@@ -37,6 +37,61 @@ app:
     allowed-issuers:
       - ${KEYCLOAK_ISSUER_EXTERNAL:http://localhost:8082/realms/social-wallet}
       - ${KEYCLOAK_ISSUER_INTERNAL:http://keycloak:8080/realms/social-wallet}
+  identity:
+    keycloak:
+      base-url: ${KEYCLOAK_URL:http://localhost:8082}
+      realm: ${KEYCLOAK_REALM:social-wallet}
+      admin-realm: ${KEYCLOAK_ADMIN_REALM:master}
+      admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
+      admin-username: ${KEYCLOAK_ADMIN_USERNAME:admin}
+      admin-password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+      client-id: ${KEYCLOAK_CLIENT_ID:social-wallet-api}
+      client-secret: ${KEYCLOAK_CLIENT_SECRET:}
+      default-role: ${KEYCLOAK_DEFAULT_ROLE:USER}
+    otp:
+      ttl-seconds: ${OTP_TTL_SECONDS:300}
+      max-attempts: ${OTP_MAX_ATTEMPTS:3}
+      debug: ${OTP_DEBUG:true}
+  openim:
+    enabled: ${OPENIM_ENABLED:true}
+    rest-base-url: ${OPENIM_REST_URL:http://localhost:10002}
+    chat-base-url: ${OPENIM_CHAT_URL:http://localhost:10008}
+    admin-base-url: ${OPENIM_ADMIN_URL:http://localhost:10009}
+    admin-account: ${OPENIM_ADMIN_ACCOUNT:chatAdmin}
+    admin-password-hash: ${OPENIM_ADMIN_PASSWORD_HASH:625031fc4e4f2de6b187e6bfa3697784}
+    admin-version: ${OPENIM_ADMIN_VERSION:1.0.0}
+    default-area-code: "${OPENIM_DEFAULT_AREA_CODE:+237}"
+    super-code: ${OPENIM_SUPER_CODE:666666}
+    platform: ${OPENIM_PLATFORM:5}
+    admin-token-ttl-seconds: ${OPENIM_ADMIN_TOKEN_TTL_SECONDS:3600}
+    password-salt: ${OPENIM_PASSWORD_SALT:change_me}
+    device-id: ${OPENIM_DEVICE_ID:backend}
+    repair-on-startup: ${OPENIM_REPAIR_ON_STARTUP:false}
+  calls:
+    livekit:
+      enabled: ${LIVEKIT_ENABLED:true}
+      url: ${LIVEKIT_URL:ws://localhost:7880}
+      api-key: ${LIVEKIT_API_KEY:devkey}
+      api-secret: ${LIVEKIT_API_SECRET:devsecretdevsecretdevsecretdevsec}
+      token-ttl-seconds: ${LIVEKIT_TOKEN_TTL_SECONDS:3600}
+  store:
+    medusa:
+      base-url: ${MEDUSA_BASE_URL:http://localhost:9000}
+      publishable-key: ${MEDUSA_PUBLISHABLE_KEY:}
+      admin-token: ${MEDUSA_ADMIN_TOKEN:}
+      webhook-secret: ${MEDUSA_WEBHOOK_SECRET:}
+    webhooks:
+      medusa:
+        retry:
+          enabled: ${STORE_WEBHOOK_RETRY_ENABLED:true}
+          fixed-delay-ms: ${STORE_WEBHOOK_RETRY_FIXED_DELAY_MS:5000}
+          batch-size: ${STORE_WEBHOOK_RETRY_BATCH_SIZE:20}
+          max-attempts: ${STORE_WEBHOOK_RETRY_MAX_ATTEMPTS:10}
+          base-delay-seconds: ${STORE_WEBHOOK_RETRY_BASE_DELAY_SECONDS:5}
+          max-delay-seconds: ${STORE_WEBHOOK_RETRY_MAX_DELAY_SECONDS:300}
+    settlement:
+      platform-fee-bps: ${STORE_PLATFORM_FEE_BPS:0}
+
 
 # Media module configuration
 media:

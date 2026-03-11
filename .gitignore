@@ -6,10 +6,14 @@
 *.iml
 .idea/
 .vscode/
+node_modules/
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime (local logs/pids)
+.runtime/
 
 # Env
 .env

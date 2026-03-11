@@ -1,0 +1,44 @@
+services:
+  medusa-db:
+    image: postgres:16
+    container_name: medusa-db
+    environment:
+      POSTGRES_DB: medusa_store
+      POSTGRES_USER: medusa
+      POSTGRES_PASSWORD: medusa
+    ports:
+      - "${MEDUSA_DB_PORT:-5434}:5432"
+    volumes:
+      - medusa-db-data:/var/lib/postgresql/data
+
+  medusa-redis:
+    image: redis:7
+    container_name: medusa-redis
+    ports:
+      - "${MEDUSA_REDIS_PORT:-6381}:6379"
+    volumes:
+      - medusa-redis-data:/data
+
+  medusa:
+    image: node:20-bookworm-slim
+    container_name: medusa-server
+    working_dir: /app
+    command: sh -c "corepack enable && yarn dev"
+    environment:
+      NODE_ENV: development
+    env_file:
+      - .env
+    volumes:
+      - ./server:/app
+      - ./server/node_modules:/app/node_modules
+    ports:
+      - "9000:9000"
+    depends_on:
+      - medusa-db
+      - medusa-redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  medusa-db-data:
+  medusa-redis-data:
