@@ -25,9 +25,7 @@ services:
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
-      # Persist a lightweight dev DB under /opt/keycloak/data (volume below).
       KC_DB: dev-file
-      # Enable health endpoints (readiness check uses OIDC config endpoint).
       KC_HEALTH_ENABLED: "true"
     ports:
       - "${KEYCLOAK_PORT:-8082}:8080"
@@ -76,7 +74,7 @@ services:
     build: .
     container_name: social-wallet-api
     environment:
-      # --- Config DB (Version flexible de ton collègue) ---
+      # --- Config DB ---
       DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-social_wallet}
       DB_USER: ${POSTGRES_USER:-social_wallet}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
@@ -85,8 +83,9 @@ services:
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8080/realms/social-wallet}
       KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/social-wallet/protocol/openid-connect/certs}
       
-      # --- Media config ---
-      DO_SPACES_ENDPOINT: http://minio:9000
+      # --- Media config MODIFIÉE ---
+      # On utilise localhost ici pour que la signature soit générée pour localhost
+      DO_SPACES_ENDPOINT: http://localhost:9000 
       DO_SPACES_ACCESS_KEY: minioadmin
       DO_SPACES_SECRET_KEY: minioadmin
       DO_SPACES_BUCKET: sw-media
@@ -105,6 +104,8 @@ services:
       # --- Starter Spring Cloud AWS ---
       SPRING_CLOUD_AWS_REGION_STATIC: us-east-1
       SPRING_CLOUD_AWS_S3_REGION: us-east-1
+      # On force aussi localhost ici pour la signature Spring Cloud
+      SPRING_CLOUD_AWS_S3_ENDPOINT: http://localhost:9000
       SPRING_CLOUD_AWS_CREDENTIALS_ACCESS_KEY: minioadmin
       SPRING_CLOUD_AWS_CREDENTIALS_SECRET_KEY: minioadmin
 
@@ -120,6 +121,8 @@ services:
         
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      # AJOUT CRUCIAL : Dit à l'API que "localhost" dans son code, c'est le conteneur minio
+      - "localhost:host-gateway" 
     ports:
       - "${API_PORT:-8080}:8080"
 

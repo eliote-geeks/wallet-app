@@ -6,6 +6,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -23,6 +24,7 @@ public class Notification {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
     @Column(name = "user_id", nullable = false)
@@ -44,7 +46,8 @@ public class Notification {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "data_json", columnDefinition = "jsonb")
-    private Map<String, Object> data;
+    @Builder.Default
+    private Map<String, Object> data = new HashMap<>();
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -70,6 +73,12 @@ public class Notification {
     protected void onCreate() {
         if (createdAt == null) {
             createdAt = Instant.now();
+        }
+        if (data == null) {
+            data = new HashMap<>();
+        }
+        if (status == null) {
+            status = NotificationStatus.PENDING;
         }
     }
 }

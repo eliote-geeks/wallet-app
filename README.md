@@ -39,6 +39,13 @@ Services exposes:
 - Keycloak: http://localhost:8082
 - Postgres: localhost:5432
 
+## Configuration Keycloak (dev)
+1. Ouvre Keycloak (http://localhost:8082)
+2. Login admin: `admin` / `admin`
+3. Cree un realm `social-wallet`
+4. Cree un client `social-wallet-api` (confidential ou bearer-only)
+5. Utilise l issuer dans `application.yml`:
+
 ## Deploiement Kubernetes + GitHub Actions
 - Guide complet: `docs/deployment/k8s-github-actions.md`
 - Workflows CI/CD:

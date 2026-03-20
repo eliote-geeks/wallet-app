@@ -100,7 +100,8 @@ media:
   storage:
     bucket: ${DO_SPACES_BUCKET:sw-media}
     region: ${DO_SPACES_REGION:us-east-1}
-    endpoint: ${DO_SPACES_ENDPOINT:http://localhost:9000}
+    # MODIFICATION DÉFINITIVE : On force localhost pour la signature cohérente
+    endpoint: ${DO_SPACES_ENDPOINT:http://localhost:9000} 
     access-key: ${DO_SPACES_ACCESS_KEY:minioadmin}
     secret-key: ${DO_SPACES_SECRET_KEY:minioadmin}
   imgproxy:

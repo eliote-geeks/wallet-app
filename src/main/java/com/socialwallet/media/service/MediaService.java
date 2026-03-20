@@ -109,12 +109,16 @@ public class MediaService {
         }
 
         // 6. Persist metadata
-        asset = mediaRepository.save(asset);
+asset = mediaRepository.save(asset);
 
-        // 7. Handle avatar replacement (only one active avatar per user)
-        if (purpose == MediaPurpose.AVATAR) {
-            deactivatePreviousAvatars(uploaderId, mediaId);
-        }
+// 7. Handle avatar replacement
+if (purpose == MediaPurpose.AVATAR) {
+    // On s'assure de passer l'ID du NOUVEAU pour ne pas l'auto-supprimer
+    deactivatePreviousAvatars(uploaderId, asset.getId()); 
+}
+
+// FORCE le rafraîchissement pour être sûr de ce qu'on renvoie au DTO
+mediaRepository.flush();
 
         // 8. Publish event
         eventPublisher.publishEvent(new MediaUploadedEvent(
